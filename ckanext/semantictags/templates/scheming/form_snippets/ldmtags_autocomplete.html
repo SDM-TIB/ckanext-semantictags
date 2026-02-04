@@ -1,0 +1,7 @@
+{% import 'macros/form.html' as form %}
+
+{% set data_module_source = h.scheming_LDMtags_get_ckan_data_module_source() %}
+
+{% set tag_attrs = {'data-module': 'autocomplete', 'data-module-tags': '', 'data-module-source': data_module_source} %}
+  {{ form.input('tag_string', id='field-tags', label=_(field.label), placeholder=_(field.form_placeholder), value=data.tag_string, error=errors.tags, classes=['control-full'], attrs=tag_attrs) }}
+
