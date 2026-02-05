@@ -9,6 +9,7 @@ import logging
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
+import ckan.lib.base as base
 import ckan.logic as logic
 import ckan.model as model
 NotFound = logic.NotFound
@@ -20,6 +21,7 @@ from ckanext.semantictags.model import tag as tag_model
 # HELPERS
 # *******
 API_URL = 'https://service.tib.eu/ts4tib/api/ontologies/{onto}/terms?size=50'
+ONTOLOGIES_KEY = 'ckanext.semantictags.ontologies'
 
 
 # TODO: test using more than one ontology
@@ -87,6 +89,19 @@ def load_ontology(ontology_name):
     OntologyManager.add_ontology(ontology_name, terms)
 
 
+def _check_access():
+    context = {
+        'model': model,
+        'session': model.Session,
+        'user': toolkit.c.user,
+        'auth_user_obj': toolkit.c.userobj
+    }
+    try:
+        logic.check_access('sysadmin', context, {})
+    except logic.NotAuthorized:
+        base.abort(403, toolkit._('Need to be system administrator to administer.'))
+
+
 # *******
 class LDM_tags_util():
 
@@ -99,11 +114,11 @@ class LDM_tags_util():
         # TODO: edit config file (ldm_tags.ontologies = oeo ... ...)
         self.vocabulary_name_default = config.get('ldm_tags.vocabulary_name', "oeo")
 
-        ontologies_config = config.get('ldm_tags.ontologies', 'oeo')
+        ontologies_config = config.get(ONTOLOGIES_KEY, 'oeo')
         self.ontologies = ontologies_config.split()
 
         # Use the following option to delete the vocabulary and recreate it again
-        self.force_reload_vocabulary_tags = config.get('ldm_tags.force_reload_vocabulary_tags', True)
+        self.force_reload_vocabulary_tags = config.get('ckanext.semantictags.force_reload_vocabulary_tags', True)
         # CKAN's API Actions
         self.action_vocabulary_show = toolkit.get_action('vocabulary_show')
         self.action_vocabulary_create = toolkit.get_action('vocabulary_create')
@@ -205,9 +220,18 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
     def update_config(self, config_):
         toolkit.add_template_directory(config_, 'templates')
         toolkit.add_public_directory(config_, 'public')
-
+        toolkit.add_ckan_admin_tab(config_, 'semantictags.admin', 'SemanticTags', icon='tags')
         # generate vocabulary if necessary
         generate_tag_vocabulary()
+
+    def update_config_schema(self, schema):
+        ignore_missing = toolkit.get_validator('ignore_missing')
+
+        schema.update({
+            ONTOLOGIES_KEY: [ignore_missing]
+        })
+
+        return schema
 
     def get_helpers(self):
         """Register the most_popular_groups() function above as a template
@@ -219,7 +243,6 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
         return {'scheming_LDMtags_get_tag_vocabulary_name': get_tag_vocabulary_name,
                 'scheming_LDMtags_get_ckan_data_module_source': get_ckan_data_module_source, 
                 'scheming_LDMtags_get_available_ontologies': get_available_ontologies}
-
 
     def get_actions(self):
         return {
@@ -236,5 +259,29 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
             limit = request.args.get('limit', 10, type=int)
             res = OntologyManager.search_terms(query, ontology, limit)
             return jsonify([t.name for t in res])
+
+        @blueprint.route('/ckan-admin/semantictags', methods=['GET', 'POST'])
+        def admin():
+            _check_access()
+
+            if request.method == 'POST':
+                action = request.form.get('action', None)
+                if action == 'ontologies':
+                    ontologies = request.form.get(ONTOLOGIES_KEY, '').strip()
+                    if not ontologies:
+                        toolkit.h.flash_error(toolkit._('Please specify at least one ontology.'))
+                    else:
+                        logic.get_action(u'config_option_update')({
+                            u'user': toolkit.c.user
+                        }, {
+                            ONTOLOGIES_KEY: ontologies
+                        })
+                        toolkit.h.flash_success(toolkit._('New ontologies set successfully.'))
+                        # TODO: Changing the config entry does not change the used ontology, also not after restart
+
+            return toolkit.render('admin_semantictags.jinja2',
+                                  extra_vars={
+                                      'ontologies': config.get(ONTOLOGIES_KEY, '').strip()
+                                  })
 
         return blueprint

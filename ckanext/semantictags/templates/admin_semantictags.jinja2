@@ -1,0 +1,28 @@
+{% extends "admin/base.html" %}
+
+{% import 'macros/form.html' as form %}
+
+{% block primary_content_inner %}
+    <div>
+        <form method="POST" action="{{ h.url_for('semantictags.admin') }}">
+            {{ form.input('ckanext.semantictags.ontologies', label=_('Ontologies'), value=ontologies, placeholder=_('e.g., oeo'), is_required=true) }}
+            <input type="hidden" name="action" value="ontologies">
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" title="{% trans %}Update{% endtrans %}">{% trans %}Update{% endtrans %}</button>
+            </div>
+        </form>
+    </div>
+{% endblock %}
+
+{% block secondary_content %}
+    <div class="module module-narrow module-shallow">
+        <h2 class="module-heading">
+            <i class="fa fa-info-circle"></i>
+            SemanticTags
+        </h2>
+        <div class="module-content">
+            <p>{% trans %}Configuration options to manage semantic tags.{% endtrans %}</p>
+            <p><strong>{% trans %}Ontologies{% endtrans %}:</strong> {% trans %}The short names (seperated by spaces) of the ontologies in the <a href="https://terminology.tib.eu/ts/" target="_blank">TIB Terminology Service</a> that are used for annotating datasets.{% endtrans %}</p>
+        </div>
+    </div>
+{% endblock %}
