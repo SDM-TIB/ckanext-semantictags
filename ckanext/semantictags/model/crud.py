@@ -16,12 +16,12 @@ class VocabularyQuery:
 
     @classmethod
     def create(cls, name):
-        '''
+        """
         Create a new record in the vocabulary table.
 
         :param name: the name of the vocabulary/ontology (e.g., 'oeo')
         :return: the newly created record object
-        '''
+        """
         new_record = Vocabulary(name=name)
         Session.add(new_record)
         Session.commit()
@@ -29,32 +29,32 @@ class VocabularyQuery:
     
     @classmethod
     def read(cls, identifier):
-        '''
+        """
         Retrieve a vocabulary record by id.
 
         :param identifier: the vocabulary id (UUID)
         :return: the record object
-        '''
+        """
         return Session.query(Vocabulary).get(identifier)
     
     @classmethod
     def read_name(cls, name):
-        '''
+        """
         Retrieve a vocabulary record by name.
 
         :param name: the vocabulary name
         :return: the record object
-        '''
+        """
         return Session.query(Vocabulary).filter(Vocabulary.name == name).first()
     
     @classmethod
     def read_or_create(cls, name):
-        '''
+        """
         Retrieve a vocabulary by name, or create it if it doesn't exist.
 
         :param name: the vocabulary name
         :return: the record object
-        '''
+        """
         record = cls.read_name(name)
         if record is None:
             record = cls.create(name)
@@ -62,13 +62,13 @@ class VocabularyQuery:
     
     @classmethod
     def update(cls, identifier, **kwargs):
-        '''
+        """
         Update fields of a vocabulary record.
 
         :param identifier: the vocabulary id
         :param kwargs: the values to be updated
         :return: the updated record object
-        '''
+        """
         update_dict = {k: v for k, v in kwargs.items() if k in cls.cols}
         Session.query(Vocabulary).filter(Vocabulary.id == identifier).update(update_dict)
         Session.commit()
@@ -76,12 +76,12 @@ class VocabularyQuery:
     
     @classmethod
     def delete(cls, identifier):
-        '''
+        """
         Delete a vocabulary and all its associated tags.
 
         :param identifier: the vocabulary id
         :return: True if a record was deleted, False if not
-        '''
+        """
         to_delete = cls.read(identifier)
         if to_delete is not None:
             # First delete all tags in this vocabulary
@@ -94,12 +94,12 @@ class VocabularyQuery:
     
     @classmethod
     def delete_name(cls, name):
-        '''
+        """
         Delete a vocabulary by name.
 
         :param name: the vocabulary name
         :return: True if a record was deleted, False if not
-        '''
+        """
         record = cls.read_name(name)
         if record is not None:
             return cls.delete(record.id)
@@ -107,13 +107,14 @@ class VocabularyQuery:
     
     @classmethod
     def list(cls):
-        '''
+        """
         List all vocabularies.
 
         :return: list of all vocabulary records
-        '''
+        """
         return Session.query(Vocabulary).all()
-    
+
+
 class TagQuery:
 
     m = Tag
@@ -137,14 +138,14 @@ class TagQuery:
 
     @classmethod
     def create(cls, name, vocabulary_id, iri=None, ontology=None):
-        '''
+        """
         Create a new record in the tag table.
 
         :param name: the tag name/label
         :param vocabulary_id: the id of the vocabulary this tag belongs to
         :param iri: the IRI for this tag (optional)
         :return: the newly created record object
-        '''
+        """
         # TODO: replace problematic characters
         
         new_record = Tag(name=name, vocabulary_id=vocabulary_id)
@@ -169,23 +170,23 @@ class TagQuery:
     
     @classmethod
     def read(cls, identifier):
-        '''
+        """
         Retrieve a tag record by id.
 
         :param identifier: the tag id (UUID)
         :return: the record object
-        '''
+        """
         return Session.query(Tag).get(identifier)
     
     @classmethod
     def read_name(cls, name, vocabulary_id=None):
-        '''
+        """
         Retrieve a tag record by name.
 
         :param name: the tag name
         :param vocabulary_id: optional vocabulary id to filter by
         :return: the record object
-        '''
+        """
         query = Session.query(Tag).filter(Tag.name == name)
         if vocabulary_id is not None:
             query = query.filter(Tag.vocabulary_id == vocabulary_id)
@@ -193,23 +194,23 @@ class TagQuery:
     
     @classmethod
     def read_iri(cls, iri):
-        '''
+        """
         Retrieve a tag record by IRI.
 
         :param iri: the tag IRI
         :return: the record object
-        '''
+        """
         return Session.query(Tag).filter(Tag.iri == iri).first()
 
     @classmethod
     def update(cls, identifier, **kwargs):
-        '''
+        """
         Update fields of a tag record.
 
         :param identifier: the tag id
         :param kwargs: the values to be updated
         :return: the updated record object
-        '''
+        """
         update_dict = {k: v for k, v in kwargs.items() if k in cls.cols}
         Session.query(Tag).filter(Tag.id == identifier).update(update_dict)
         Session.commit()
@@ -217,12 +218,12 @@ class TagQuery:
 
     @classmethod
     def delete(cls, identifier):
-        '''
+        """
         Delete a tag by id.
 
         :param identifier: the tag id
         :return: True if a record was deleted, False if not
-        '''
+        """
         to_delete = cls.read(identifier)
         if to_delete is not None:
             Session.delete(to_delete)
@@ -232,37 +233,36 @@ class TagQuery:
     
     @classmethod
     def delete_vocabulary(cls, vocabulary_id):
-        '''
+        """
         Delete all tags belonging to a vocabulary.
 
         :param vocabulary_id: the vocabulary id
         :return: the number of records deleted
-        '''
+        """
         count = Session.query(Tag).filter(Tag.vocabulary_id == vocabulary_id).delete()
         Session.commit()
         return count
 
     @classmethod
     def list_(cls, vocabulary_id):
-        '''
+        """
         List all tags in a vocabulary.
 
         :param vocabulary_id: the vocabulary id
         :return: list of tag records
-        '''
+        """
         return Session.query(Tag).filter(Tag.vocabulary_id == vocabulary_id).all()
-
 
     @classmethod
     def search(cls, query, vocabulary_id=None, limit=10):
-        '''
+        """
         Search for tags by name (case-insensitive substring match)
 
         :param query: the search string
         :param vocabulary_id: optional vocabulary id to filter by
         :param limit: maximum number of results (default: 10)
         :return: list of matching tag records
-        '''
+        """
         if not query:
             return []
 
@@ -354,13 +354,13 @@ class OntologyManager:
 
     @classmethod
     def add_ontology(cls, ontology_name, terms):
-        '''
+        """
         Add or replace an ontology with its terms.
 
         :param ontology_name: name of the ontology (e.g., 'oeo')
         :param terms: list of dicts with 'label' and 'iri' keys
         :return: the vocabulary record
-        '''
+        """
         # Get or create vocabulary
         vocab = VocabularyQuery.read_name(ontology_name)
         
@@ -384,34 +384,34 @@ class OntologyManager:
     
     @classmethod
     def delete_ontology(cls, ontology_name):
-        '''
+        """
         Delete an ontology and all its terms.
 
         :param ontology_name: name of the ontology
         :return: True if deleted, False if not found
-        '''
+        """
         return VocabularyQuery.delete_name(ontology_name)
     
     @classmethod
     def list_ontologies(cls):
-        '''
+        """
         List all available ontologies.
 
         :return: list of dicts with 'id' and 'name' keys
-        '''
+        """
         vocabs = VocabularyQuery.list()
         return [{'id': v.id, 'name': v.name} for v in vocabs]
 
     @classmethod
     def search_terms(cls, query, ontology_name=None, limit=10):
-        '''
+        """
         Search for terms across ontologies.
 
         :param query: the search string
         :param ontology_name: optional ontology name to filter by
         :param limit: maximum number of results (default: 10)
         :return: list of dicts with term information
-        '''
+        """
         vocabulary_id = None
         if ontology_name:
             vocab = VocabularyQuery.read_name(ontology_name)

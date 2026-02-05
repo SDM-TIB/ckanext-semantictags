@@ -9,8 +9,6 @@ import logging
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
-import os
-import yaml
 import ckan.logic as logic
 import ckan.model as model
 NotFound = logic.NotFound
@@ -24,22 +22,16 @@ from ckanext.semantictags.model import tag as tag_model
 API_URL = 'https://service.tib.eu/ts4tib/api/ontologies/{onto}/terms?size=50'
 
 
-
-# TODO
-# - add database table for the terms, iri, and ontology (example: https://github.com/SDM-TIB/LDM_Docker/blob/main/Plugins/ckanext-doi/ckanext/doi/model/doi.py)
-# - populate the database with entries from the Terminology Service with a given ontology, here 'oeo'
-# - display close matches (see https://github.com/ckan/ckan/blob/2.9/ckan/logic/action/get.py#L2209-L2212)
-#   - maybe we will add a new API call for our purpose
-# - allow more than just one ontology
+# TODO: test using more than one ontology
 
 
 @toolkit.side_effect_free
 def autocomplete_term(context, data):
-    '''
+    """
     Docstring for autocomplete_term
-    
+
     :param data: Description
-    '''
+    """
     query = data.get('q') or data.get('incomplete', '')
     ontology = data.get('ontology')
     limit = data.get('limit', 10)
@@ -49,6 +41,7 @@ def autocomplete_term(context, data):
         {'name': t.name, 'iri': getattr(t, 'iri', None)}
         for t in res
     ]
+
 
 def get_terms_by_ontology(onto):
     api_url = API_URL.format(onto=onto)
@@ -72,22 +65,27 @@ def get_terms_by_ontology(onto):
 
     return terms
 
+
 def get_tag_vocabulary_name():
     tags_util = LDM_tags_util()
     name = tags_util.vocabulary_name_default
     return name
+
 
 def get_ckan_data_module_source():
     tags_util = LDM_tags_util()
     dsource = tags_util.get_ckan_data_module_source()
     return dsource
 
+
 def get_available_ontologies():
     return OntologyManager.list_ontologies()
+
 
 def load_ontology(ontology_name):
     terms = get_terms_by_ontology(ontology_name)
     OntologyManager.add_ontology(ontology_name, terms)
+
 
 # *******
 class LDM_tags_util():
@@ -204,23 +202,17 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
         tag_model.init_table()
         generate_tag_vocabulary()
 
-    # IConfigurer
-
     def update_config(self, config_):
         toolkit.add_template_directory(config_, 'templates')
         toolkit.add_public_directory(config_, 'public')
-        toolkit.add_resource('fanstatic', 'tibimport')
 
         # generate vocabulary if necessary
         generate_tag_vocabulary()
 
-    # IBlueprint
-
     def get_helpers(self):
-        '''Register the most_popular_groups() function above as a template
+        """Register the most_popular_groups() function above as a template
         helper function.
-
-        '''
+        """
         # Template helper function names should begin with the name of the
         # extension they belong to, to avoid clashing with functions from
         # other extensions.
@@ -231,7 +223,7 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
 
     def get_actions(self):
         return {
-            'term_autocomplete' : autocomplete_term
+            'term_autocomplete': autocomplete_term
         }
 
     def get_blueprint(self):

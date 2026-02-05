@@ -3,9 +3,9 @@ from ckan.model.tag import Tag, tag_table
 
 
 def add_iri_column():
-    '''
+    """
     Add iri column to CKAN's existing tag table
-    '''
+    """
     result = Session.execute("""
         SELECT 1
         FROM information_schema.columns
@@ -18,10 +18,11 @@ def add_iri_column():
         return True
     return False
 
+
 def add_ontology_column():
-    '''
+    """
     Add ontology column to CKAN's existing tag table
-    '''
+    """
     result = Session.execute("""
         SELECT 1
         FROM information_schema.columns
@@ -34,11 +35,13 @@ def add_ontology_column():
         return True
     return False
 
+
 def init_table():
-    '''
+    """
     Initialize the tag table extension.
-    '''
+    """
     add_iri_column()
     add_ontology_column()
+
 
 __all__ = ['Tag', 'tag_table', 'add_iri_column', 'add_ontology_column', 'init_table']
