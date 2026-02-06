@@ -12,10 +12,14 @@ log.setLevel(logging.DEBUG)
 import ckan.lib.base as base
 import ckan.logic as logic
 import ckan.model as model
+
 NotFound = logic.NotFound
 
 from ckanext.semantictags.model.crud import OntologyManager, TagQuery, VocabularyQuery
 from ckanext.semantictags.model import tag as tag_model
+from ckanext.semantictags.model.tag import Tag
+
+from sqlalchemy import text
 
 
 # HELPERS
@@ -111,11 +115,11 @@ class LDM_tags_util():
         # self.LDMtags_vocabulary_plugin_enabled = toolkit.asbool(config.get('ldm_tags.vocabulary_plugin_enabled', False))
         self.LDMtags_vocabulary_plugin_enabled = True
 
-        # TODO: edit config file (ldm_tags.ontologies = oeo ... ...)
         self.vocabulary_name_default = config.get('ldm_tags.vocabulary_name', "oeo")
 
         ontologies_config = config.get(ONTOLOGIES_KEY, 'oeo')
         self.ontologies = ontologies_config.split()
+        log.debug(f"ONTOLOGIES LIST: {self.ontologies}")
 
         # Use the following option to delete the vocabulary and recreate it again
         self.force_reload_vocabulary_tags = config.get('ckanext.semantictags.force_reload_vocabulary_tags', True)
@@ -162,43 +166,80 @@ class LDM_tags_util():
             result = {}
         return result
 
-    def create_vocabulary(self, vocabulary_name="", vocabulary_file=""):
+    def create_vocabulary(self, vocabulary_name="", ontologies=None):
         log.debug('in create_vocabulary')
         vocabulary_name = self._check_vocabulary_name(vocabulary_name)
+        
+        if ontologies is None:
+            ontologies = self.ontologies
 
         vocab = VocabularyQuery.read_name(vocabulary_name)
-        if vocab and not self.force_reload_vocabulary_tags:
-            return
-        if vocab:
-            TagQuery.delete_vocabulary(vocab.id)
-        else:
+        if not vocab:
             vocab = VocabularyQuery.create(vocabulary_name)
 
+        result = model.Session.execute(
+            text("""
+                SELECT DISTINCT ontology 
+                FROM tag 
+                WHERE vocabulary_id = :vocab_id 
+                AND ontology IS NOT NULL
+            """),
+            {'vocab_id': vocab.id}
+        )
+        existing_ontologies = set(row[0] for row in result.fetchall())
+        
+        requested_ontologies = set(ontologies)
+        
+        to_delete = existing_ontologies - requested_ontologies
+        to_add = requested_ontologies - existing_ontologies
+        
+        log.debug(f"Existing: {existing_ontologies}")
+        log.debug(f"Requested: {requested_ontologies}")
+        log.debug(f"To delete: {to_delete}")
+        log.debug(f"To add: {to_add}")
+
+        for ontology in to_delete:
+            model.Session.execute(
+                text("""
+                    DELETE FROM tag 
+                    WHERE vocabulary_id = :vocab_id 
+                    AND ontology = :ontology
+                """),
+                {'vocab_id': vocab.id, 'ontology': ontology}
+            )
+            log.debug(f"Deleted tags from ontology: {ontology}")
+        model.Session.commit()
+
         seen = set()
-        for ontology in self.ontologies:
-            terms = get_terms_by_ontology(ontology)
-            for term in terms:
-                label = term.get('label')
-                if not label:
-                    continue
-                name = label.replace(',', '_').replace('/', '_')
-                key = term.get('iri') or name
-                if not key or key in seen:
-                    continue
-                seen.add(key)
-                if TagQuery.read_name(name, vocabulary_id=vocab.id):
-                    continue
-                TagQuery.create(
-                    name=name,
-                    vocabulary_id=vocab.id,
-                    iri=term.get('iri'),
-                    ontology=term.get('ontology') or ontology
-                )
+        for ontology in to_add:
+            log.debug(f"Loading new ontology: {ontology}")
+            try:
+                terms = get_terms_by_ontology(ontology)
+                for term in terms:
+                    label = term.get('label')
+                    if not label:
+                        continue
+                    name = label.replace(',', '_').replace('/', '_')
+                    key = term.get('iri') or name
+                    if not key or key in seen:
+                        continue
+                    seen.add(key)
+                    if TagQuery.read_name(name, vocabulary_id=vocab.id):
+                        continue
+                    TagQuery.create(
+                        name=name,
+                        vocabulary_id=vocab.id,
+                        iri=term.get('iri'),
+                        ontology=term.get('ontology') or ontology
+                    )
+                log.debug(f"Loaded {len(terms)} terms from {ontology}")
+            except Exception as e:
+                log.error(f"Failed to load ontology {ontology}: {e}")
+                raise
 
-
-def generate_tag_vocabulary():
+def generate_tag_vocabulary(ontologies=None):
     tags_util = LDM_tags_util()
-    tags_util.create_vocabulary()
+    tags_util.create_vocabulary(ontologies=ontologies)
 
 
 class LDMtagsPlugin(plugins.SingletonPlugin):
@@ -276,8 +317,12 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
                         }, {
                             ONTOLOGIES_KEY: ontologies
                         })
+
+                        # Update ontology list
+                        ontologies_list = ontologies.split()
+                        generate_tag_vocabulary(ontologies=ontologies_list)
+
                         toolkit.h.flash_success(toolkit._('New ontologies set successfully.'))
-                        # TODO: Changing the config entry does not change the used ontology, also not after restart
 
             return toolkit.render('admin_semantictags.jinja2',
                                   extra_vars={

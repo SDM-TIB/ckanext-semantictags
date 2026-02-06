@@ -254,12 +254,13 @@ class TagQuery:
         return Session.query(Tag).filter(Tag.vocabulary_id == vocabulary_id).all()
 
     @classmethod
-    def search(cls, query, vocabulary_id=None, limit=10):
+    def search(cls, query, vocabulary_id=None, ontology=None, limit=10):
         """
         Search for tags by name (case-insensitive substring match)
 
         :param query: the search string
         :param vocabulary_id: optional vocabulary id to filter by
+        :param ontology: optional ontology name to filter by (e.g., 'oeo', 'envo')
         :param limit: maximum number of results (default: 10)
         :return: list of matching tag records
         """
@@ -271,11 +272,15 @@ class TagQuery:
             return []
 
         base = Session.query(Tag)
+    
         if vocabulary_id is not None:
             base = base.filter(Tag.vocabulary_id == vocabulary_id)
         else:
-            # Only return tags that belong to a vocabulary
             base = base.filter(Tag.vocabulary_id.isnot(None))
+
+        if ontology is not None:
+            base = base.filter(text("ontology = :ontology")).params(ontology=ontology)
+
 
         query_lower = query.lower()
         name_lower = func.lower(Tag.name)
@@ -323,7 +328,7 @@ class TagQuery:
             except ProgrammingError:
                 Session.rollback()
 
-        # Fallback:  use difflib SequenceMatcher
+        # Fallback: use difflib SequenceMatcher
         if remaining > 0:
             candidates = base.with_entities(Tag.id, Tag.name)
 
@@ -348,7 +353,7 @@ class TagQuery:
                     results.extend(tags)
 
         return results
-    
+        
 
 class OntologyManager:
 
@@ -401,21 +406,15 @@ class OntologyManager:
         """
         vocabs = VocabularyQuery.list()
         return [{'id': v.id, 'name': v.name} for v in vocabs]
-
+    
     @classmethod
     def search_terms(cls, query, ontology_name=None, limit=10):
         """
         Search for terms across ontologies.
 
         :param query: the search string
-        :param ontology_name: optional ontology name to filter by
+        :param ontology_name: optional ontology name to filter by (e.g., 'oeo', 'envo')
         :param limit: maximum number of results (default: 10)
-        :return: list of dicts with term information
+        :return: list of matching tag records
         """
-        vocabulary_id = None
-        if ontology_name:
-            vocab = VocabularyQuery.read_name(ontology_name)
-            if vocab:
-                vocabulary_id = vocab.id
-        
-        return TagQuery.search(query, vocabulary_id, limit)
+        return TagQuery.search(query, vocabulary_id=None, ontology=ontology_name, limit=limit)
