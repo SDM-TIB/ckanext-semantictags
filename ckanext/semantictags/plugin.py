@@ -17,9 +17,6 @@ NotFound = logic.NotFound
 
 from ckanext.semantictags.model.crud import OntologyManager, TagQuery, VocabularyQuery
 from ckanext.semantictags.model import tag as tag_model
-from ckanext.semantictags.model.tag import Tag
-
-from sqlalchemy import text
 
 
 # HELPERS
@@ -87,12 +84,6 @@ def get_ckan_data_module_source():
 def get_available_ontologies():
     return OntologyManager.list_ontologies()
 
-
-def load_ontology(ontology_name):
-    terms = get_terms_by_ontology(ontology_name)
-    OntologyManager.add_ontology(ontology_name, terms)
-
-
 def _check_access():
     context = {
         'model': model,
@@ -153,19 +144,6 @@ class LDM_tags_util():
             vocabulary_name = self.vocabulary_name_default
         return vocabulary_name
 
-    def read_vocabulary_from_ckan(self, vocabulary_name=""):
-        vocabulary_name = self._check_vocabulary_name(vocabulary_name)
-        # Load Tag Vocabulary from DB
-        log.debug('LOADING TAG VOCABULARY FROM CKAN: ' + str(vocabulary_name))
-        context = {'model': model, 'session': model.Session, 'ignore_auth': True, 'user': 'admin'}
-        data = {'id': vocabulary_name}
-        try:
-            result = self.action_vocabulary_show(context, data)
-        except NotFound as e:
-            log.error("ERROR LOADING TAG VOCABULARY: " + str(e))
-            result = {}
-        return result
-
     def create_vocabulary(self, vocabulary_name="", ontologies=None):
         log.debug('in create_vocabulary')
         vocabulary_name = self._check_vocabulary_name(vocabulary_name)
@@ -177,65 +155,44 @@ class LDM_tags_util():
         if not vocab:
             vocab = VocabularyQuery.create(vocabulary_name)
 
-        result = model.Session.execute(
-            text("""
-                SELECT DISTINCT ontology 
-                FROM tag 
-                WHERE vocabulary_id = :vocab_id 
-                AND ontology IS NOT NULL
-            """),
-            {'vocab_id': vocab.id}
-        )
-        existing_ontologies = set(row[0] for row in result.fetchall())
-        
+        # check which ontologies already exist in DB
+        existing_ontologies = OntologyManager.get_loaded_ontologies(vocab.id)
         requested_ontologies = set(ontologies)
         
         to_delete = existing_ontologies - requested_ontologies
         to_add = requested_ontologies - existing_ontologies
         
-        log.debug(f"Existing: {existing_ontologies}")
-        log.debug(f"Requested: {requested_ontologies}")
-        log.debug(f"To delete: {to_delete}")
-        log.debug(f"To add: {to_add}")
+        log.debug(f"Existing: {existing_ontologies}, Requested: {requested_ontologies}")
+        log.debug(f"To delete: {to_delete}, To add: {to_add}")
 
+        if not to_delete and not to_add and not self.force_reload_vocabulary_tags:
+            log.debug("All ontologies are already loaded.")
+            return
+        
+        # Delete ontologies that are no longer needed
         for ontology in to_delete:
-            model.Session.execute(
-                text("""
-                    DELETE FROM tag 
-                    WHERE vocabulary_id = :vocab_id 
-                    AND ontology = :ontology
-                """),
-                {'vocab_id': vocab.id, 'ontology': ontology}
-            )
-            log.debug(f"Deleted tags from ontology: {ontology}")
-        model.Session.commit()
+            OntologyManager.delete_ontology(vocab.id, ontology)
 
-        seen = set()
+        # Force reload 
+        if self.force_reload_vocabulary_tags:
+            to_reload = existing_ontologies & requested_ontologies  
+            for ontology in to_reload:
+                OntologyManager.delete_ontology(vocab.id, ontology)
+            to_add = to_add | to_reload 
+
         for ontology in to_add:
-            log.debug(f"Loading new ontology: {ontology}")
+            # check again if loading is required 
+            if OntologyManager.is_ontology_loaded(vocab.id, ontology):
+                log.debug(f"Ontology {ontology} was loaded by another worker, skipping")
+                continue
+
+            log.debug(f"Loading ontology: {ontology}")
             try:
                 terms = get_terms_by_ontology(ontology)
-                for term in terms:
-                    label = term.get('label')
-                    if not label:
-                        continue
-                    name = label.replace(',', '_').replace('/', '_')
-                    key = term.get('iri') or name
-                    if not key or key in seen:
-                        continue
-                    seen.add(key)
-                    if TagQuery.read_name(name, vocabulary_id=vocab.id):
-                        continue
-                    TagQuery.create(
-                        name=name,
-                        vocabulary_id=vocab.id,
-                        iri=term.get('iri'),
-                        ontology=term.get('ontology') or ontology
-                    )
+                OntologyManager.add_ontology(vocab.id, ontology, terms)
                 log.debug(f"Loaded {len(terms)} terms from {ontology}")
             except Exception as e:
                 log.error(f"Failed to load ontology {ontology}: {e}")
-                raise
 
 def generate_tag_vocabulary(ontologies=None):
     tags_util = LDM_tags_util()

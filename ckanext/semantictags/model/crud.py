@@ -85,24 +85,11 @@ class VocabularyQuery:
         to_delete = cls.read(identifier)
         if to_delete is not None:
             # First delete all tags in this vocabulary
-            TagQuery.delete_vocabulary(identifier)
+            TagQuery.delete_by_vocabulary(identifier)
             # Then delete the vocabulary
             Session.delete(to_delete)
             Session.commit()
             return True
-        return False
-    
-    @classmethod
-    def delete_name(cls, name):
-        """
-        Delete a vocabulary by name.
-
-        :param name: the vocabulary name
-        :return: True if a record was deleted, False if not
-        """
-        record = cls.read_name(name)
-        if record is not None:
-            return cls.delete(record.id)
         return False
     
     @classmethod
@@ -232,7 +219,7 @@ class TagQuery:
         return False
     
     @classmethod
-    def delete_vocabulary(cls, vocabulary_id):
+    def delete_by_vocabulary(cls, vocabulary_id):
         """
         Delete all tags belonging to a vocabulary.
 
@@ -358,7 +345,35 @@ class TagQuery:
 class OntologyManager:
 
     @classmethod
-    def add_ontology(cls, ontology_name, terms):
+    def get_loaded_ontologies(cls, vocabulary_id):
+        """Get list of ontologies already loaded in a vocabulary."""
+        result = Session.execute(
+            text("""
+                SELECT DISTINCT ontology 
+                FROM tag 
+                WHERE vocabulary_id = :vocab_id 
+                AND ontology IS NOT NULL
+            """),
+            {'vocab_id': vocabulary_id}
+        )
+        return set(row[0] for row in result.fetchall())
+
+    @classmethod
+    def is_ontology_loaded(cls, vocabulary_id, ontology_name):
+        """Check if an ontology is already loaded."""
+        result = Session.execute(
+            text("""
+                SELECT COUNT(*) 
+                FROM tag 
+                WHERE vocabulary_id = :vocab_id 
+                AND ontology = :ontology
+            """),
+            {'vocab_id': vocabulary_id, 'ontology': ontology_name}
+        )
+        return result.fetchone()[0] > 0
+    
+    @classmethod
+    def add_ontology(cls, vocabulary_id, ontology_name, terms):
         """
         Add or replace an ontology with its terms.
 
@@ -366,36 +381,55 @@ class OntologyManager:
         :param terms: list of dicts with 'label' and 'iri' keys
         :return: the vocabulary record
         """
-        # Get or create vocabulary
-        vocab = VocabularyQuery.read_name(ontology_name)
-        
-        if vocab is not None:
-            # Clear existing tags
-            TagQuery.delete_vocabulary(vocab.id)
-        else:
-            # Create new vocabulary
-            vocab = VocabularyQuery.create(ontology_name)
-        
-        # Add all terms as tags
+        seen = set()
+        count = 0
         for term in terms:
-            TagQuery.create(
-                name=term['label'],
-                vocabulary_id=vocab.id,
-                iri=term.get('iri'),
-                ontology=term.get('ontology') or ontology_name
-            )
-        
-        return vocab
+            label = term.get('label')
+            if not label:
+                continue
+            name = label.replace(',', '_').replace('/', '_')
+            key = term.get('iri') or name
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            if TagQuery.read_name(name, vocabulary_id=vocabulary_id):
+                continue
+            try:
+                TagQuery.create(
+                    name=name,
+                    vocabulary_id=vocabulary_id,
+                    iri=term.get('iri'),
+                    ontology=term.get('ontology') or ontology_name
+                )
+                count += 1
+            except Exception as e:
+                log.debug(f"Tag '{name}' already exists, skipping")
+                Session.rollback()
+                continue
+        log.debug(f"Added {count} terms for ontology: {ontology_name}")
+        return count
     
     @classmethod
-    def delete_ontology(cls, ontology_name):
+    def delete_ontology(cls, vocabulary_id, ontology_name):
         """
-        Delete an ontology and all its terms.
+        Delete all tags for a specific ontology.
 
+        :param vocabulary_id: the vocabulary id
         :param ontology_name: name of the ontology
-        :return: True if deleted, False if not found
+        :return: number of tags deleted
         """
-        return VocabularyQuery.delete_name(ontology_name)
+        result = Session.execute(
+            text("""
+                DELETE FROM tag 
+                WHERE vocabulary_id = :vocab_id 
+                AND ontology = :ontology
+            """),
+            {'vocab_id': vocabulary_id, 'ontology': ontology_name}
+        )
+        Session.commit()
+        count = result.rowcount
+        log.debug(f"Deleted {count} tags from ontology: {ontology_name}")
+        return count
     
     @classmethod
     def list_ontologies(cls):
