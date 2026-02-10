@@ -1,7 +1,7 @@
 import requests
 import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, request
 from ckan.common import config
 d = toolkit.g
 
@@ -29,21 +29,26 @@ ONTOLOGIES_KEY = 'ckanext.semantictags.ontologies'
 
 
 @toolkit.side_effect_free
-def autocomplete_term(context, data):
+def autocomplete_term(context, data_dict):
     """
-    Docstring for autocomplete_term
+    Autocomplete tags from ontologies.
 
-    :param data: Description
+    :param q: partial query string
+    :type q: str
+    :param limit: maximum number of results (default 10)
+    :type limit: int
+    :param ontology: name of the ontology to check (by default all are considered)
+    :type ontology: str
+
+    :returns: JSON in the same format as CKAN util autocomplete:
+              ["Tag 1", "Tag 2", "...", "Tag n"]
     """
-    query = data.get('q') or data.get('incomplete', '')
-    ontology = data.get('ontology')
-    limit = data.get('limit', 10)
+    query = data_dict.get('q') or data_dict.get('incomplete', '')
+    ontology = data_dict.get('ontology')
+    limit = int(data_dict.get('limit') or 10)
 
     res = OntologyManager.search_terms(query, ontology, limit)
-    return [
-        {'name': t.name, 'iri': getattr(t, 'iri', None)}
-        for t in res
-    ]
+    return [t.name for t in res]
 
 
 def get_terms_by_ontology(onto):
@@ -76,7 +81,7 @@ def get_tag_vocabulary_name():
 
 
 def get_data_module_source():
-    return '/api/2/util/term_autocomplete?incomplete=?'
+    return '/api/3/action/semantictags_autocomplete?incomplete=?'
 
 
 def get_available_ontologies():
@@ -235,19 +240,11 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
 
     def get_actions(self):
         return {
-            'term_autocomplete': autocomplete_term
+            'semantictags_autocomplete': autocomplete_term
         }
 
     def get_blueprint(self):
         blueprint = Blueprint('semantictags', __name__)
-
-        @blueprint.route('/api/2/util/term_autocomplete')
-        def term_autocomplete_api():
-            query = request.args.get('q') or request.args.get('incomplete', '')
-            ontology = request.args.get('ontology')
-            limit = request.args.get('limit', 10, type=int)
-            res = OntologyManager.search_terms(query, ontology, limit)
-            return jsonify([t.name for t in res])
 
         @blueprint.route('/ckan-admin/semantictags', methods=['GET', 'POST'])
         def admin():
