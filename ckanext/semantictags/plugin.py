@@ -74,18 +74,13 @@ def get_terms_by_ontology(onto):
     return terms
 
 
-def get_tag_vocabulary_name():
-    tags_util = LDM_tags_util()
-    name = tags_util.vocabulary_name_default
-    return name
-
-
 def get_data_module_source():
     return '/api/3/action/semantictags_autocomplete?incomplete=?'
 
 
 def get_available_ontologies():
     return OntologyManager.list_ontologies()
+
 
 def _check_access():
     context = {
@@ -105,9 +100,6 @@ class LDM_tags_util():
 
     def __init__(self):
         log.debug('Inside the Tag Plugin')
-
-        # self.LDMtags_vocabulary_plugin_enabled = toolkit.asbool(config.get('ldm_tags.vocabulary_plugin_enabled', False))
-        self.LDMtags_vocabulary_plugin_enabled = True
 
         self.vocabulary_name_default = config.get('ldm_tags.vocabulary_name', "oeo")
 
@@ -190,6 +182,7 @@ class LDM_tags_util():
             except Exception as e:
                 log.error(f"Failed to load ontology {ontology}: {e}")
 
+
 def generate_tag_vocabulary(ontologies=None):
     tags_util = LDM_tags_util()
     tags_util.create_vocabulary(ontologies=ontologies)
@@ -197,14 +190,9 @@ def generate_tag_vocabulary(ontologies=None):
 
 class LDMtagsPlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IConfigurer)
-    # Declare that this plugin will implement ITemplateHelpers.
     plugins.implements(plugins.ITemplateHelpers)
-    # Declare to use autocomplete feature
     plugins.implements(plugins.IActions) 
     plugins.implements(plugins.IBlueprint)
-
-    # this plugin is using the preset "ldmtags_string_autocomplete" in ckanext.scheming.presets.json
-    # This presets is setting the "form_snippet": "ldmtags_autocomplete.html"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -234,8 +222,7 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
         # Template helper function names should begin with the name of the
         # extension they belong to, to avoid clashing with functions from
         # other extensions.
-        return {'semantictags_tag_vocabulary_name': get_tag_vocabulary_name,
-                'semantictags_data_module_source': get_data_module_source,
+        return {'semantictags_data_module_source': get_data_module_source,
                 'semantictags_available_ontologies': get_available_ontologies}
 
     def get_actions(self):
