@@ -75,10 +75,8 @@ def get_tag_vocabulary_name():
     return name
 
 
-def get_ckan_data_module_source():
-    tags_util = LDM_tags_util()
-    dsource = tags_util.get_ckan_data_module_source()
-    return dsource
+def get_data_module_source():
+    return '/api/2/util/term_autocomplete?incomplete=?'
 
 
 def get_available_ontologies():
@@ -131,13 +129,6 @@ class LDM_tags_util():
         toolkit.auth_allow_anonymous_access(self.action_tag_create)
         toolkit.auth_allow_anonymous_access(self.action_tag_delete)
         toolkit.auth_allow_anonymous_access(self.action_tag_list)
-
-    def get_ckan_data_module_source(self):
-        if self.LDMtags_vocabulary_plugin_enabled:
-            data_module_source = '/api/2/util/term_autocomplete?incomplete=?'
-        else:
-            data_module_source = "/api/2/util/term_autocomplete?incomplete=?"
-        return data_module_source
 
     def _check_vocabulary_name(self, vocabulary_name):
         if not vocabulary_name:
@@ -238,9 +229,9 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
         # Template helper function names should begin with the name of the
         # extension they belong to, to avoid clashing with functions from
         # other extensions.
-        return {'scheming_LDMtags_get_tag_vocabulary_name': get_tag_vocabulary_name,
-                'scheming_LDMtags_get_ckan_data_module_source': get_ckan_data_module_source, 
-                'scheming_LDMtags_get_available_ontologies': get_available_ontologies}
+        return {'semantictags_tag_vocabulary_name': get_tag_vocabulary_name,
+                'semantictags_data_module_source': get_data_module_source,
+                'semantictags_available_ontologies': get_available_ontologies}
 
     def get_actions(self):
         return {
