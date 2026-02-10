@@ -109,23 +109,6 @@ class LDM_tags_util():
 
         # Use the following option to delete the vocabulary and recreate it again
         self.force_reload_vocabulary_tags = config.get('ckanext.semantictags.force_reload_vocabulary_tags', True)
-        # CKAN's API Actions
-        self.action_vocabulary_show = toolkit.get_action('vocabulary_show')
-        self.action_vocabulary_create = toolkit.get_action('vocabulary_create')
-        self.action_vocabulary_update = toolkit.get_action('vocabulary_update')
-        self.action_vocabulary_delete = toolkit.get_action('vocabulary_delete')
-
-        self.action_tag_create = toolkit.get_action('tag_create')
-        self.action_tag_delete = toolkit.get_action('tag_delete')
-        self.action_tag_list = toolkit.get_action('tag_list')
-        # Allow unauthorized execution
-        toolkit.auth_allow_anonymous_access(self.action_vocabulary_show)
-        toolkit.auth_allow_anonymous_access(self.action_vocabulary_create)
-        toolkit.auth_allow_anonymous_access(self.action_vocabulary_update)
-        toolkit.auth_allow_anonymous_access(self.action_vocabulary_delete)
-        toolkit.auth_allow_anonymous_access(self.action_tag_create)
-        toolkit.auth_allow_anonymous_access(self.action_tag_delete)
-        toolkit.auth_allow_anonymous_access(self.action_tag_list)
 
     def _check_vocabulary_name(self, vocabulary_name):
         if not vocabulary_name:
