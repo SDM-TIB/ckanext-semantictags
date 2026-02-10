@@ -23,6 +23,7 @@ from ckanext.semantictags.model import tag as tag_model
 # *******
 API_URL = 'https://service.tib.eu/ts4tib/api/ontologies/{onto}/terms?size=50'
 ONTOLOGIES_KEY = 'ckanext.semantictags.ontologies'
+FREE_TAGS_KEY = 'ckanext.semantictags.allow_free_tags'
 
 
 # TODO: test using more than one ontology
@@ -80,6 +81,10 @@ def get_data_module_source():
 
 def get_available_ontologies():
     return OntologyManager.list_ontologies()
+
+
+def free_tags_allowed():
+    return config.get(FREE_TAGS_KEY)
 
 
 def _check_access():
@@ -186,6 +191,10 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
         toolkit.add_template_directory(config_, 'templates')
         toolkit.add_public_directory(config_, 'public')
         toolkit.add_ckan_admin_tab(config_, 'semantictags.admin', 'SemanticTags', icon='tags')
+
+        if config_.get(FREE_TAGS_KEY, None) is None:
+            config_[FREE_TAGS_KEY] = 'false'
+
         # generate vocabulary if necessary
         generate_tag_vocabulary()
 
@@ -193,7 +202,8 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
         ignore_missing = toolkit.get_validator('ignore_missing')
 
         schema.update({
-            ONTOLOGIES_KEY: [ignore_missing]
+            ONTOLOGIES_KEY: [ignore_missing],
+            FREE_TAGS_KEY: [ignore_missing]
         })
 
         return schema
@@ -205,8 +215,11 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
         # Template helper function names should begin with the name of the
         # extension they belong to, to avoid clashing with functions from
         # other extensions.
-        return {'semantictags_data_module_source': get_data_module_source,
-                'semantictags_available_ontologies': get_available_ontologies}
+        return {
+            'semantictags_data_module_source': get_data_module_source,
+            'semantictags_available_ontologies': get_available_ontologies,
+            'semantictags_enable_freetags': free_tags_allowed
+        }
 
     def get_actions(self):
         return {
@@ -238,10 +251,23 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
                         generate_tag_vocabulary(ontologies=ontologies_list)
 
                         toolkit.h.flash_success(toolkit._('New ontologies set successfully.'))
+                elif action == 'free_tags':
+                    free_tags = request.form.get(FREE_TAGS_KEY)
+                    try:
+                        free_tags = toolkit.asbool(free_tags)
+                    except (ValueError, TypeError):
+                        toolkit.h.flash_error(toolkit._('Please specify a value that can be parsed as a boolean.'))
+                    logic.get_action(u'config_option_update')({
+                        u'user': toolkit.c.user
+                    }, {
+                        FREE_TAGS_KEY: 'true' if free_tags else 'false'
+                    })
+                    toolkit.h.flash_success(toolkit._('Free tags option updated successfully.'))
 
             return toolkit.render('admin_semantictags.jinja2',
                                   extra_vars={
-                                      'ontologies': config.get(ONTOLOGIES_KEY, '').strip()
+                                      'ontologies': config.get(ONTOLOGIES_KEY, '').strip(),
+                                      'free_tags': config.get(FREE_TAGS_KEY)
                                   })
 
         return blueprint
