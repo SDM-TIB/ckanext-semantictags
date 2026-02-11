@@ -8,7 +8,7 @@ from ckan.common import config
 from ckan.plugins.toolkit import asbool
 from ckanext.semantictags.model.crud import OntologyManager, TagQuery, VocabularyQuery
 
-API_URL = 'https://service.tib.eu/ts4tib/api/ontologies/{onto}/terms?size=50'
+API_URL = 'https://api.terminology.tib.eu/api/v2/ontologies/{onto}/classes'
 ONTOLOGIES_KEY = 'ckanext.semantictags.ontologies'
 FREE_TAGS_KEY = 'ckanext.semantictags.allow_free_tags'
 FORCE_RELOAD_KEY = 'ckanext.semantictags.force_reload'
@@ -17,22 +17,31 @@ FORCE_RELOAD_KEY = 'ckanext.semantictags.force_reload'
 def get_terms_by_ontology(onto):
     api_url = API_URL.format(onto=onto)
     terms = []
+    page = 0
     while True:
-        response = requests.get(api_url)
+        params = {'page': page, 'size': 50}
+        response = requests.get(api_url, params=params)
         response.raise_for_status()
         data = response.json()
 
-        for term in data['_embedded']['terms']:
+        for term in data.get('elements', []):
             iri = term.get('iri')
-            label = term.get('label')
+            label = term.get('label')[0]
+            if isinstance(label, dict):
+                label = label.get('value')
 
             if iri and label:
                 terms.append({'iri': iri, 'label': label, 'ontology': onto})
 
-        if data['_links'].get('next') is not None:
-            api_url = data['_links']['next']['href']
+        total_pages = data.get('totalPages')
+        if total_pages is not None:
+            page += 1
+            if page >= total_pages:
+                break
         else:
-            break
+            if not data.get('elements'):
+                break
+            page += 1
 
     return terms
 
