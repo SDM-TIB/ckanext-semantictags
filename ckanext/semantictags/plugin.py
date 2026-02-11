@@ -17,6 +17,7 @@ NotFound = logic.NotFound
 
 from ckanext.semantictags.model.crud import OntologyManager, TagQuery, VocabularyQuery
 from ckanext.semantictags.model import tag as tag_model
+from ckan.plugins.toolkit import asbool
 
 
 # HELPERS
@@ -24,6 +25,7 @@ from ckanext.semantictags.model import tag as tag_model
 API_URL = 'https://service.tib.eu/ts4tib/api/ontologies/{onto}/terms?size=50'
 ONTOLOGIES_KEY = 'ckanext.semantictags.ontologies'
 FREE_TAGS_KEY = 'ckanext.semantictags.allow_free_tags'
+FORCE_RELOAD_KEY = 'ckanext.semantictags.force_reload'
 
 
 # TODO: test using more than one ontology
@@ -112,9 +114,6 @@ class LDM_tags_util():
         self.ontologies = ontologies_config.split()
         log.debug(f"ONTOLOGIES LIST: {self.ontologies}")
 
-        # Use the following option to delete the vocabulary and recreate it again
-        self.force_reload_vocabulary_tags = config.get('ckanext.semantictags.force_reload_vocabulary_tags', True)
-
     def _check_vocabulary_name(self, vocabulary_name):
         if not vocabulary_name:
             vocabulary_name = self.vocabulary_name_default
@@ -123,6 +122,7 @@ class LDM_tags_util():
     def create_vocabulary(self, vocabulary_name="", ontologies=None):
         log.debug('in create_vocabulary')
         vocabulary_name = self._check_vocabulary_name(vocabulary_name)
+        force_reload_vocabulary_tags = asbool(config.get(FORCE_RELOAD_KEY))
         
         if ontologies is None:
             ontologies = self.ontologies
@@ -141,7 +141,7 @@ class LDM_tags_util():
         log.debug(f"Existing: {existing_ontologies}, Requested: {requested_ontologies}")
         log.debug(f"To delete: {to_delete}, To add: {to_add}")
 
-        if not to_delete and not to_add and not self.force_reload_vocabulary_tags:
+        if not to_delete and not to_add and not force_reload_vocabulary_tags:
             log.debug("All ontologies are already loaded.")
             return
         
@@ -150,7 +150,7 @@ class LDM_tags_util():
             OntologyManager.delete_ontology(vocab.id, ontology)
 
         # Force reload 
-        if self.force_reload_vocabulary_tags:
+        if force_reload_vocabulary_tags:
             to_reload = existing_ontologies & requested_ontologies  
             for ontology in to_reload:
                 OntologyManager.delete_ontology(vocab.id, ontology)
@@ -185,7 +185,7 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         tag_model.init_table()
-        generate_tag_vocabulary()
+        # generate_tag_vocabulary()
 
     def update_config(self, config_):
         toolkit.add_template_directory(config_, 'templates')
@@ -194,6 +194,8 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
 
         if config_.get(FREE_TAGS_KEY, None) is None:
             config_[FREE_TAGS_KEY] = 'false'
+        if config_.get(FORCE_RELOAD_KEY, None) is None:
+            config_[FORCE_RELOAD_KEY] = 'false'
 
         # generate vocabulary if necessary
         generate_tag_vocabulary()
@@ -203,7 +205,8 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
 
         schema.update({
             ONTOLOGIES_KEY: [ignore_missing],
-            FREE_TAGS_KEY: [ignore_missing]
+            FREE_TAGS_KEY: [ignore_missing],
+            FORCE_RELOAD_KEY: [ignore_missing]
         })
 
         return schema
@@ -254,7 +257,7 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
                 elif action == 'free_tags':
                     free_tags = request.form.get(FREE_TAGS_KEY)
                     try:
-                        free_tags = toolkit.asbool(free_tags)
+                        free_tags = asbool(free_tags)
                     except (ValueError, TypeError):
                         toolkit.h.flash_error(toolkit._('Please specify a value that can be parsed as a boolean.'))
                     logic.get_action(u'config_option_update')({
@@ -263,11 +266,24 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
                         FREE_TAGS_KEY: 'true' if free_tags else 'false'
                     })
                     toolkit.h.flash_success(toolkit._('Free tags option updated successfully.'))
+                elif action == 'force_reload':
+                    force_reload = request.form.get(FORCE_RELOAD_KEY)
+                    try:
+                        force_reload = asbool(force_reload)
+                    except (ValueError, TypeError):
+                        toolkit.h.flash_error(toolkit._('Please specify a value that can be parsed as a boolean.'))
+                    logic.get_action(u'config_option_update')({
+                        u'user': toolkit.c.user
+                    }, {
+                        FORCE_RELOAD_KEY: 'true' if force_reload else 'false'
+                    })
+                    toolkit.h.flash_success(toolkit._('Force reload option updated successfully.'))
 
             return toolkit.render('admin_semantictags.jinja2',
                                   extra_vars={
                                       'ontologies': config.get(ONTOLOGIES_KEY, '').strip(),
-                                      'free_tags': config.get(FREE_TAGS_KEY)
+                                      'free_tags': config.get(FREE_TAGS_KEY),
+                                      'force_reload': config.get(FORCE_RELOAD_KEY)
                                   })
 
         return blueprint

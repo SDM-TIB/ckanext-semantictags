@@ -22,6 +22,16 @@
             </div>
         </form>
     </div>
+    <hr>
+    <div>
+        <form method="POST" action="{{ h.url_for('semantictags.admin') }}">
+            {{ form.select('ckanext.semantictags.force_reload', label=_('Force Tag Reload'), options=[{'value': 'true', 'text': _('Yes')}, {'value': 'false',  'text': _('No')}], selected=force_reload, classes=['control-medium'], is_required=true) }}
+            <input type="hidden" name="action" value="force_reload">
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" title="{% trans %}Update{% endtrans %}">{% trans %}Update{% endtrans %}</button>
+            </div>
+        </form>
+    </div>
 {% endblock %}
 
 {% block secondary_content %}
@@ -34,6 +44,7 @@
             <p>{% trans %}Configuration options to manage semantic tags.{% endtrans %}</p>
             <p><strong>{% trans %}Ontologies{% endtrans %}:</strong> {% trans %}The short names (seperated by spaces) of the ontologies in the <a href="https://terminology.tib.eu/ts/" target="_blank">TIB Terminology Service</a> that are used for annotating datasets.{% endtrans %}</p>
             <p><strong>{% trans %}Allow Free Tags{% endtrans %}:</strong> {% trans %}Whether to allow users to add their own tags that do not belong to the configured ontologies.{% endtrans %}</p>
+            <p><strong>{% trans %}Force Tag Reload{% endtrans %}:</strong> {% trans %}Whether to reload all tags on startup even if the ontology / ontologies are already loaded.{% endtrans %}</p>
         </div>
     </div>
 {% endblock %}
