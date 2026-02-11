@@ -43,28 +43,26 @@ def semantictags():
 
 
 @semantictags.command('init')
-def init():
+@click.option('--free-tags/--no-free-tags', default=False, help='Allow free tags by default')
+@click.option('--force-reload/--no-force-reload', default=False, help='Force reload of vocabularies by default')
+def init(free_tags, force_reload):
     """
-    Initialize SemanticTags runtime data:
+    Initialize ckanext-semantictags runtime data:
 
-    - ensure default config options exist in DB
-    - optionally init DB tables
-    - generate tag vocabulary (protected by PG advisory lock)
+    - initializes the database table
+    - ensures default config options are set
+    - generates tag vocabulary
+
+    The default values for free tags and force reloading are only considered if no value was
+    previously set in the CKAN configuration. CKAN configuration values have precedence.
     """
     tag_model.init_table()
     click.echo("Database initialized.")
 
-    allow_free_tags = _ensure_default(FREE_TAGS_KEY, 'false')
-    force_reload = _ensure_default(FORCE_RELOAD_KEY, 'false')
+    _ensure_default(FREE_TAGS_KEY, free_tags)
+    _ensure_default(FORCE_RELOAD_KEY, force_reload)
 
-    click.echo(f"{FREE_TAGS_KEY}={allow_free_tags}")
-    click.echo(f"{FORCE_RELOAD_KEY}={force_reload}")
-
-    if toolkit.asbool(force_reload):
-        generate_tag_vocabulary()
-        click.echo("Vocabulary generated.")
-    else:
-        click.echo("force_reload is false; skipping vocabulary generation.")
+    generate_tag_vocabulary()
 
 
 @semantictags.command()
