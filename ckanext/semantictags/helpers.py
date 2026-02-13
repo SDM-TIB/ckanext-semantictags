@@ -6,6 +6,7 @@ log.setLevel(logging.DEBUG)
 
 from ckan.common import config
 from ckan.plugins.toolkit import asbool
+from ckan.lib.munge import munge_tag
 from ckanext.semantictags.model.crud import OntologyManager, TagQuery, VocabularyQuery
 
 API_URL = 'https://api.terminology.tib.eu/api/v2/ontologies/{onto}/classes'
@@ -44,6 +45,42 @@ def get_terms_by_ontology(onto):
             page += 1
 
     return terms
+
+
+def resolve_vocab_tags(data_dict):
+    tags = data_dict.get('tags')
+    tag_string = data_dict.get('tag_string')
+    if not tags and tag_string:
+        raw = [t.strip() for t in tag_string.split(',') if t.strip()]
+        tags = [{'name': t} for t in raw]
+    if not tags:
+        return
+
+    vocab_name = config.get('ldm_tags.vocabulary_name', 'oeo')
+    vocab = VocabularyQuery.read_name(vocab_name)
+    if not vocab:
+        return
+
+    resolved = []
+    for tag in tags:
+        if isinstance(tag, str):
+            tag = {'name': tag}
+        name = tag.get('name')
+        if not name:
+            continue
+        munged = munge_tag(name)
+        tag = dict(tag)
+        tag['name'] = munged
+        vocab_tag = TagQuery.read_name(munged, vocabulary_id=vocab.id)
+        if vocab_tag:
+            tag['id'] = vocab_tag.id
+            tag['vocabulary_id'] = vocab.id
+        resolved.append(tag)
+
+    if resolved:
+        data_dict['tags'] = resolved
+        if tag_string is not None:
+            data_dict.pop('tag_string', None)
 
 
 def generate_tag_vocabulary(ontologies=None):

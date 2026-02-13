@@ -11,14 +11,17 @@ log.setLevel(logging.DEBUG)
 import ckan.lib.base as base
 import ckan.logic as logic
 import ckan.model as model
+from ckan.logic.action.create import package_create as core_package_create
+from ckan.logic.action.update import package_update as core_package_update
+from ckan.logic.action.get import package_show as core_package_show
 
 NotFound = logic.NotFound
 
-from ckanext.semantictags.model.crud import OntologyManager
+from ckanext.semantictags.model.crud import OntologyManager, TagQuery
 from ckanext.semantictags.model import tag as tag_model
 from ckan.plugins.toolkit import asbool
 from ckanext.semantictags import cli
-from ckanext.semantictags.helpers import API_URL, ONTOLOGIES_KEY, FREE_TAGS_KEY, FORCE_RELOAD_KEY, get_terms_by_ontology, generate_tag_vocabulary, LDM_tags_util
+from ckanext.semantictags.helpers import API_URL, ONTOLOGIES_KEY, FREE_TAGS_KEY, FORCE_RELOAD_KEY, get_terms_by_ontology, generate_tag_vocabulary, LDM_tags_util, resolve_vocab_tags
 
 
 @toolkit.side_effect_free
@@ -44,6 +47,37 @@ def autocomplete_term(context, data_dict):
     return [t.name for t in res]
 
 
+@toolkit.side_effect_free
+def package_show(context, data_dict):
+    data = core_package_show(context, data_dict)
+    tags = data.get('tags', [])
+    if not tags:
+        return data
+
+    for tag in tags:
+        tag_id = tag.get('id')
+        tag_row = TagQuery.read(tag_id)
+        if not tag_row:
+            log.debug(f"Tag {tag.get('name')} not found in Tag Table")
+            continue
+        tag['iri'] = tag_row.iri
+        tag['ontology'] = tag_row.ontology
+        if getattr(tag_row, 'vocabulary_id', None) and not tag.get('vocabulary_id'):
+            tag['vocabulary_id'] = tag_row.vocabulary_id
+
+    return data
+
+
+def package_create(context, data_dict):
+    resolve_vocab_tags(data_dict)
+    return core_package_create(context, data_dict)
+
+
+def package_update(context, data_dict):
+    resolve_vocab_tags(data_dict)
+    return core_package_update(context, data_dict)
+
+
 def get_data_module_source():
     return '/api/3/action/semantictags_autocomplete?incomplete=?'
 
@@ -54,7 +88,6 @@ def get_available_ontologies():
 
 def free_tags_allowed():
     return config.get(FREE_TAGS_KEY)
-
 
 def _check_access():
     context = {
@@ -115,7 +148,10 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
 
     def get_actions(self):
         return {
-            'semantictags_autocomplete': autocomplete_term
+            'semantictags_autocomplete': autocomplete_term,
+            'package_show': package_show, 
+            'package_create': package_create,
+            'package_update': package_update
         }
 
     def get_blueprint(self):

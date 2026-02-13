@@ -5,6 +5,7 @@ from sqlalchemy import case, func, text
 from sqlalchemy.exc import ProgrammingError
 from ckanext.semantictags.model.vocabulary import Vocabulary, vocabulary_table
 from ckanext.semantictags.model.tag import Tag, tag_table
+from ckan.lib.munge import munge_tag
 
 log = logging.getLogger(__name__)
 
@@ -163,7 +164,20 @@ class TagQuery:
         :param identifier: the tag id (UUID)
         :return: the record object
         """
-        return Session.query(Tag).get(identifier)
+        tag = Session.query(Tag).get(identifier)
+        if tag is None:
+            return None
+        try:
+            row = Session.execute(
+                text("SELECT iri, ontology FROM tag WHERE id = :id"),
+                {'id': identifier}
+            ).fetchone()
+            if row:
+                tag.iri = row[0]
+                tag.ontology = row[1]
+        except Exception:
+            log.debug("Failed to load iri/ontology for tag", exc_info=True)
+        return tag
     
     @classmethod
     def read_name(cls, name, vocabulary_id=None):
@@ -387,7 +401,7 @@ class OntologyManager:
             label = term.get('label')
             if not label:
                 continue
-            name = label.replace(',', '_').replace('/', '_')
+            name = munge_tag(label)
             key = term.get('iri') or name
             if not key or key in seen:
                 continue
