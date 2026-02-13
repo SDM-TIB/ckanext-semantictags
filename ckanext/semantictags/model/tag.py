@@ -43,5 +43,4 @@ def init_table():
     add_iri_column()
     add_ontology_column()
 
-
 __all__ = ['Tag', 'tag_table', 'add_iri_column', 'add_ontology_column', 'init_table']
