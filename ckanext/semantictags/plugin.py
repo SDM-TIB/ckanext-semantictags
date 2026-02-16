@@ -204,14 +204,11 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
                     })
                     toolkit.h.flash_success(toolkit._('Force reload option updated successfully.'))
 
-            ctx = {'ignore_auth': True, 'model': model, 'session': model.Session}
-            log.error("config.get=%r", config.get(FORCE_RELOAD_KEY))
-            log.error("config_option_show=%r", toolkit.get_action('config_option_show')(ctx, {'key': FORCE_RELOAD_KEY}))
             return toolkit.render('admin_semantictags.jinja2',
                                   extra_vars={
                                       'ontologies': config.get(ONTOLOGIES_KEY, '').strip(),
-                                      'free_tags': config.get(FREE_TAGS_KEY),
-                                      'force_reload': config.get(FORCE_RELOAD_KEY)
+                                      'free_tags': config.get(FREE_TAGS_KEY).lower(),
+                                      'force_reload': config.get(FORCE_RELOAD_KEY).lower()
                                   })
 
         return blueprint
