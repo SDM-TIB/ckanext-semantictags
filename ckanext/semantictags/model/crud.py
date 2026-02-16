@@ -125,36 +125,38 @@ class TagQuery:
             return False
 
     @classmethod
-    def create(cls, name, vocabulary_id, iri=None, ontology=None):
+    def create(cls, name, vocabulary_id, iri=None, ontology=None, label=None):
         """
         Create a new record in the tag table.
 
-        :param name: the tag name/label
+        :param name: the tag name/label (munged)
         :param vocabulary_id: the id of the vocabulary this tag belongs to
         :param iri: the IRI for this tag (optional)
+        :param ontology: the ontology this tag belongs to (optional)
+        :param label: the original display label (optional)
         :return: the newly created record object
         """
         # TODO: replace problematic characters
-        
+
         new_record = Tag(name=name, vocabulary_id=vocabulary_id)
         Session.add(new_record)
-        Session.flush() 
+        Session.flush()
 
-        update_fields = {}
-        if iri:
-            update_fields['iri'] = iri
-        if ontology:
-            update_fields['ontology'] = ontology
-        if update_fields:
-            set_clause = ", ".join([f"{k} = :{k}" for k in update_fields])
-            update_fields['id'] = new_record.id
+        if iri or ontology or label:
+            update_values = {}
+            if iri:
+                update_values['iri'] = iri
+            if ontology:
+                update_values['ontology'] = ontology
+            if label:
+                update_values['label'] = label
+
             Session.execute(
-                f"UPDATE tag SET {set_clause} WHERE id = :id",
-                update_fields
+                tag_table.update().where(tag_table.c.id == new_record.id).values(**update_values)
             )
 
         Session.commit()
-        return new_record
+        return cls.read(new_record.id)
     
     @classmethod
     def read(cls, identifier):
@@ -164,19 +166,25 @@ class TagQuery:
         :param identifier: the tag id (UUID)
         :return: the record object
         """
-        tag = Session.query(Tag).get(identifier)
-        if tag is None:
+        row = Session.query(
+            Tag.id,
+            Tag.name,
+            Tag.vocabulary_id,
+            tag_table.c.iri,
+            tag_table.c.ontology,
+            tag_table.c.label
+        ).filter(Tag.id == identifier).first()
+
+        if row is None:
             return None
-        try:
-            row = Session.execute(
-                text("SELECT iri, ontology FROM tag WHERE id = :id"),
-                {'id': identifier}
-            ).fetchone()
-            if row:
-                tag.iri = row[0]
-                tag.ontology = row[1]
-        except Exception:
-            log.debug("Failed to load iri/ontology for tag", exc_info=True)
+
+        # Create Tag object with all attributes
+        tag = Tag(name=row[1], vocabulary_id=row[2])
+        tag.id = row[0]
+        tag.iri = row[3]
+        tag.ontology = row[4]
+        tag.label = row[5]
+
         return tag
     
     @classmethod
@@ -272,7 +280,14 @@ class TagQuery:
         if not query:
             return []
 
-        base = Session.query(Tag)
+        base = Session.query(
+            Tag.id,
+            Tag.name,
+            Tag.vocabulary_id,
+            tag_table.c.iri,
+            tag_table.c.ontology,
+            tag_table.c.label
+        )
     
         if vocabulary_id is not None:
             base = base.filter(Tag.vocabulary_id == vocabulary_id)
@@ -280,22 +295,28 @@ class TagQuery:
             base = base.filter(Tag.vocabulary_id.isnot(None))
 
         if ontology is not None:
-            base = base.filter(text("ontology = :ontology")).params(ontology=ontology)
-
+            base = base.filter(tag_table.c.ontology == ontology)
 
         query_lower = query.lower()
         name_lower = func.lower(Tag.name)
+        label_lower = func.lower(func.coalesce(tag_table.c.label, Tag.name))
+
         rank = case(
             [
                 (name_lower == query_lower, 0),
+                (label_lower == query_lower, 0),
                 (name_lower.startswith(query_lower), 1),
+                (label_lower.startswith(query_lower), 1),
             ],
             else_=2,
         )
 
         initial = (
-            base.filter(name_lower.contains(query_lower))
-            .order_by(rank, name_lower)
+            base.filter(
+                (name_lower.contains(query_lower)) |
+                (label_lower.contains(query_lower))
+            )
+            .order_by(rank, label_lower)
             .limit(limit)
             .all()
         )
@@ -310,20 +331,46 @@ class TagQuery:
         # Use pg_trgm similarity (if available)
         if remaining > 0 and cls._pg_trgm_enabled():
             try:
-                similarity = func.similarity(func.lower(Tag.name), query_lower)
-                trigram_q = base.filter(similarity >= cls.close_match_similarity)
+                label_or_name = func.coalesce(tag_table.c.label, Tag.name)
+                similarity = func.similarity(func.lower(label_or_name), query_lower)
+
+                trigram_base = Session.query(
+                    Tag.id,
+                    Tag.name,
+                    Tag.vocabulary_id,
+                    tag_table.c.iri,
+                    tag_table.c.ontology,
+                    tag_table.c.label
+                )
+
+                if vocabulary_id is not None:
+                    trigram_base = trigram_base.filter(Tag.vocabulary_id == vocabulary_id)
+                else:
+                    trigram_base = trigram_base.filter(Tag.vocabulary_id.isnot(None))
+
+                if ontology is not None:
+                    trigram_base = trigram_base.filter(tag_table.c.ontology == ontology)
+
+                trigram_q = trigram_base.filter(similarity >= cls.close_match_similarity)
 
                 if seen_ids:
                     trigram_q = trigram_q.filter(~Tag.id.in_(seen_ids))
 
-                trigram = trigram_q.order_by(
+                trigram_rows = trigram_q.order_by(
                     similarity.desc(),
-                    func.length(Tag.name),
-                    func.lower(Tag.name),
+                    func.length(label_or_name),
+                    func.lower(label_or_name),
                 ).limit(remaining).all()
 
-                results.extend(trigram)
-                seen_ids.update(t.id for t in trigram)
+                for row in trigram_rows:
+                    tag = Tag(name=row[1], vocabulary_id=row[2])
+                    tag.id = row[0]
+                    tag.iri = row[3]
+                    tag.ontology = row[4]
+                    tag.label = row[5]
+                    results.append(tag)
+                    seen_ids.add(tag.id)
+
                 remaining = limit - len(results)
 
             except ProgrammingError:
@@ -331,27 +378,49 @@ class TagQuery:
 
         # Fallback: use difflib SequenceMatcher
         if remaining > 0:
-            candidates = base.with_entities(Tag.id, Tag.name)
+            candidates_base = Session.query(
+                Tag.id,
+                Tag.name,
+                Tag.vocabulary_id,
+                tag_table.c.iri,
+                tag_table.c.ontology,
+                tag_table.c.label
+            )
+
+            if vocabulary_id is not None:
+                candidates_base = candidates_base.filter(Tag.vocabulary_id == vocabulary_id)
+            else:
+                candidates_base = candidates_base.filter(Tag.vocabulary_id.isnot(None))
+
+            if ontology is not None:
+                candidates_base = candidates_base.filter(tag_table.c.ontology == ontology)
 
             if seen_ids:
-                candidates = candidates.filter(~Tag.id.in_(seen_ids))
-            candidates = candidates.limit(cls.close_match_candidate_limit).all()
+                candidates_base = candidates_base.filter(~Tag.id.in_(seen_ids))
+
+            candidate_rows = candidates_base.limit(cls.close_match_candidate_limit).all()
 
             scored = []
-            for tag_id, name in candidates:
-                ratio = SequenceMatcher(None, query_lower, name.lower()).ratio()
-                if ratio >= cls.close_match_ratio:
-                    scored.append((ratio, tag_id))
+            for row in candidate_rows:
+                tag_id, name, vocab_id, iri, ont, label = row
+                # Use label for matching, fall back to name if label is None
+                search_text = (label or name or "").lower()
+                if search_text:  # Only compare if we have text
+                    ratio = SequenceMatcher(None, query_lower, search_text).ratio()
+                    if ratio >= cls.close_match_ratio:
+                        scored.append((ratio, row))
 
             if scored:
-                scored.sort(reverse=True)
-                ids = [tag_id for _, tag_id in scored[:remaining]]
+                scored.sort(reverse=True, key=lambda x: x[0])
+                top_rows = [row for _, row in scored[:remaining]]
 
-                if ids:
-                    id_to_rank = {tag_id: idx for idx, tag_id in enumerate(ids)}
-                    tags = base.filter(Tag.id.in_(ids)).all()
-                    tags.sort(key=lambda t: id_to_rank.get(t.id, 0))
-                    results.extend(tags)
+                for row in top_rows:
+                    tag = Tag(name=row[1], vocabulary_id=row[2])
+                    tag.id = row[0]
+                    tag.iri = row[3]
+                    tag.ontology = row[4]
+                    tag.label = row[5]
+                    results.append(tag)
 
         return results
         
@@ -413,7 +482,8 @@ class OntologyManager:
                     name=name,
                     vocabulary_id=vocabulary_id,
                     iri=term.get('iri'),
-                    ontology=term.get('ontology') or ontology_name
+                    ontology=term.get('ontology') or ontology_name,
+                    label=label
                 )
                 count += 1
             except Exception as e:

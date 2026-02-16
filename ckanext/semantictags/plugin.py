@@ -44,7 +44,9 @@ def autocomplete_term(context, data_dict):
     limit = int(data_dict.get('limit') or 10)
 
     res = OntologyManager.search_terms(query, ontology, limit)
-    return [t.name for t in res]
+
+    # Return label if available, otherwise fall back to name
+    return [getattr(t, 'label', None) or t.name for t in res]
 
 
 @toolkit.side_effect_free
@@ -62,6 +64,8 @@ def package_show(context, data_dict):
             continue
         tag['iri'] = tag_row.iri
         tag['ontology'] = tag_row.ontology
+        if hasattr(tag_row, 'label') and tag_row.label:
+            tag['display_name'] = tag_row.label
         if getattr(tag_row, 'vocabulary_id', None) and not tag.get('vocabulary_id'):
             tag['vocabulary_id'] = tag_row.vocabulary_id
 
