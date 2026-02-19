@@ -2,11 +2,12 @@ import logging
 
 import ckan.model as model
 import ckan.plugins.toolkit as toolkit
+from ckan.common import config
 import click
 #from ckan.types import Context
 from typing import Dict, Any
 Context = Dict[str, Any]
-from ckanext.semantictags.helpers import get_terms_by_ontology, FREE_TAGS_KEY, FORCE_RELOAD_KEY, generate_tag_vocabulary
+from ckanext.semantictags.helpers import get_terms_by_ontology, FREE_TAGS_KEY, FORCE_RELOAD_KEY, generate_tag_vocabulary, LDM_tags_util
 from ckanext.semantictags.model import tag as tag_model
 from ckanext.semantictags.model.crud import OntologyManager, TagQuery, VocabularyQuery
 
@@ -33,6 +34,11 @@ def _ensure_default(key, default_value):
         value = default_value
 
     return value
+
+
+def _get_vocab():
+    tags_util = LDM_tags_util()
+    return VocabularyQuery.read_or_create(tags_util.vocabulary_name_default)
 
 
 def get_commands():
@@ -75,7 +81,8 @@ def load_ontology(ontology_name):
 
     try:
         terms = get_terms_by_ontology(ontology_name)
-        OntologyManager.add_ontology(ontology_name, terms)
+        vocab = _get_vocab()
+        OntologyManager.add_ontology(vocab.id, ontology_name, terms)
         click.echo(f"Successfully loaded {len(terms)} terms for {ontology_name}")
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
@@ -85,7 +92,8 @@ def load_ontology(ontology_name):
 @click.argument('ontology_name')
 def delete_ontology(ontology_name):
     """Delete an ontology and all its terms"""
-    if OntologyManager.delete_ontology(ontology_name):
+    vocab = _get_vocab()
+    if OntologyManager.delete_ontology(vocab.id, ontology_name):
         click.echo(f"Deleted ontology: {ontology_name}")
     else:
         click.echo(f"Ontology not found: {ontology_name}", err=True)

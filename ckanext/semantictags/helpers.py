@@ -93,7 +93,7 @@ class LDM_tags_util():
     def __init__(self):
         log.debug('Inside the Tag Plugin')
 
-        self.vocabulary_name_default = config.get('ldm_tags.vocabulary_name', "oeo")
+        self.vocabulary_name_default = config.get('ldm_tags.vocabulary_name', "semantictags")
 
         ontologies_config = config.get(ONTOLOGIES_KEY, 'oeo')
         self.ontologies = ontologies_config.split()
@@ -122,7 +122,10 @@ class LDM_tags_util():
         requested_ontologies = set(ontologies)
 
         to_delete = existing_ontologies - requested_ontologies
-        to_add = requested_ontologies - existing_ontologies
+        if force_reload_vocabulary_tags:
+            to_add = requested_ontologies
+        else:
+            to_add = requested_ontologies - existing_ontologies
 
         log.debug(f"Existing: {existing_ontologies}, Requested: {requested_ontologies}")
         log.debug(f"To delete: {to_delete}, To add: {to_add}")
@@ -135,23 +138,16 @@ class LDM_tags_util():
         for ontology in to_delete:
             OntologyManager.delete_ontology(vocab.id, ontology)
 
-        # Force reload
-        if force_reload_vocabulary_tags:
-            to_reload = existing_ontologies & requested_ontologies
-            for ontology in to_reload:
-                OntologyManager.delete_ontology(vocab.id, ontology)
-            to_add = to_add | to_reload
-
         for ontology in to_add:
             # check again if loading is required
-            if OntologyManager.is_ontology_loaded(vocab.id, ontology):
+            if not force_reload_vocabulary_tags and OntologyManager.is_ontology_loaded(vocab.id, ontology):
                 log.debug(f"Ontology {ontology} was loaded by another worker, skipping")
                 continue
 
             log.debug(f"Loading ontology: {ontology}")
             try:
                 terms = get_terms_by_ontology(ontology)
-                OntologyManager.add_ontology(vocab.id, ontology, terms)
+                OntologyManager.add_ontology(vocab.id, ontology, terms, refresh_existing=force_reload_vocabulary_tags)
                 log.debug(f"Loaded {len(terms)} terms from {ontology}")
             except Exception as e:
                 log.error(f"Failed to load ontology {ontology}: {e}")

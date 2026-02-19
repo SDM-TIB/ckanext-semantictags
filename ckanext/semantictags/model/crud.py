@@ -456,7 +456,7 @@ class OntologyManager:
         return result.fetchone()[0] > 0
     
     @classmethod
-    def add_ontology(cls, vocabulary_id, ontology_name, terms):
+    def add_ontology(cls, vocabulary_id, ontology_name, terms, refresh_existing=False):
         """
         Add or replace an ontology with its terms.
 
@@ -464,6 +464,18 @@ class OntologyManager:
         :param terms: list of dicts with 'label' and 'iri' keys
         :return: the vocabulary record
         """
+
+        # Reattach existing tags from ontology to vocabulary 
+        Session.execute(
+            text("""
+                UPDATE tag
+                SET vocabulary_id = :vocab_id
+                WHERE ontology = :ontology
+                AND vocabulary_id IS NULL
+            """),
+            {'vocab_id': vocabulary_id, 'ontology': ontology_name}
+        )
+        Session.commit()
         seen = set()
         count = 0
         for term in terms:
@@ -475,14 +487,33 @@ class OntologyManager:
             if not key or key in seen:
                 continue
             seen.add(key)
-            if TagQuery.read_name(name, vocabulary_id=vocabulary_id):
+            ontology_value = term.get('ontology') or ontology_name
+            existing = Session.query(Tag.id, Tag.vocabulary_id).filter(
+                Tag.name == name,
+                tag_table.c.ontology == ontology_value
+            ).first()
+            if existing:
+                update_values = {}
+                if existing.vocabulary_id != vocabulary_id:
+                    update_values['vocabulary_id'] = vocabulary_id
+                if refresh_existing:
+                    iri = term.get('iri')
+                    if iri is not None:
+                        update_values['iri'] = iri
+                    update_values['ontology'] = ontology_value
+                    update_values['label'] = label
+                if update_values:
+                    Session.execute(
+                        tag_table.update().where(tag_table.c.id == existing.id).values(**update_values)
+                    )
+                    Session.commit()
                 continue
             try:
                 TagQuery.create(
                     name=name,
                     vocabulary_id=vocabulary_id,
                     iri=term.get('iri'),
-                    ontology=term.get('ontology') or ontology_name,
+                    ontology=ontology_value,
                     label=label
                 )
                 count += 1
@@ -502,17 +533,29 @@ class OntologyManager:
         :param ontology_name: name of the ontology
         :return: number of tags deleted
         """
-        result = Session.execute(
+        detached = Session.execute(
             text("""
-                DELETE FROM tag 
-                WHERE vocabulary_id = :vocab_id 
+                UPDATE tag
+                SET vocabulary_id = NULL
+                WHERE vocabulary_id = :vocab_id
                 AND ontology = :ontology
+                AND id IN (SELECT tag_id FROM package_tag)
+            """),
+            {'vocab_id': vocabulary_id, 'ontology': ontology_name}
+        )
+
+        deleted = Session.execute(
+            text("""
+                DELETE FROM tag
+                WHERE vocabulary_id = :vocab_id
+                AND ontology = :ontology
+                AND id NOT IN (SELECT tag_id FROM package_tag)
             """),
             {'vocab_id': vocabulary_id, 'ontology': ontology_name}
         )
         Session.commit()
-        count = result.rowcount
-        log.debug(f"Deleted {count} tags from ontology: {ontology_name}")
+        count = detached.rowcount + deleted.rowcount
+        log.debug(f"Detached {detached.rowcount} tags and deleted {deleted.rowcount} tags from ontology: {ontology_name}")
         return count
     
     @classmethod
