@@ -17,7 +17,7 @@ from ckan.logic.action.get import package_show as core_package_show
 
 NotFound = logic.NotFound
 
-from ckanext.semantictags.model.crud import OntologyManager, TagQuery
+from ckanext.semantictags.model.crud import OntologyManager, TagQuery, VocabularyQuery
 from ckanext.semantictags.model import tag as tag_model
 from ckan.plugins.toolkit import asbool
 from ckanext.semantictags import cli
@@ -40,10 +40,14 @@ def autocomplete_term(context, data_dict):
               ["Tag 1", "Tag 2", "...", "Tag n"]
     """
     query = data_dict.get('q') or data_dict.get('incomplete', '')
-    ontology = data_dict.get('ontology')
     limit = int(data_dict.get('limit') or 10)
 
-    res = OntologyManager.search_terms(query, ontology, limit)
+    tags_util = LDM_tags_util()
+    vocab = VocabularyQuery.read_name(tags_util.vocabulary_name_default)
+    if not vocab:
+        return []
+
+    res = OntologyManager.search_terms(query, limit=limit, vocabulary_id=vocab.id)
 
     # Return label if available, otherwise fall back to name
     return [getattr(t, 'label', None) or t.name for t in res]

@@ -112,11 +112,10 @@ def list_ontologies():
 
 @semantictags.command()
 @click.argument('query')
-@click.option('--ontology', '-o', default=None, help='Filter by ontology')
 @click.option('--limit', '-l', default=10, help='Max results')
-def search(query, ontology, limit):
+def search(query, limit):
     """Search for terms."""
-    results = OntologyManager.search_terms(query, ontology, limit)
+    results = OntologyManager.search_terms(query, limit)
     if results:
         for term in results:
             click.echo(f"- {term.name} | {getattr(term, 'iri', None)} | {getattr(term, 'ontology', None)}")

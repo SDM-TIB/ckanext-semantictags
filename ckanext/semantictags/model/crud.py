@@ -263,13 +263,12 @@ class TagQuery:
         return Session.query(Tag).filter(Tag.vocabulary_id == vocabulary_id).all()
 
     @classmethod
-    def search(cls, query, vocabulary_id=None, ontology=None, limit=10):
+    def search(cls, query, vocabulary_id=None, limit=10):
         """
         Search for tags by name (case-insensitive substring match)
 
         :param query: the search string
         :param vocabulary_id: optional vocabulary id to filter by
-        :param ontology: optional ontology name to filter by (e.g., 'oeo', 'envo')
         :param limit: maximum number of results (default: 10)
         :return: list of matching tag records
         """
@@ -293,9 +292,6 @@ class TagQuery:
             base = base.filter(Tag.vocabulary_id == vocabulary_id)
         else:
             base = base.filter(Tag.vocabulary_id.isnot(None))
-
-        if ontology is not None:
-            base = base.filter(tag_table.c.ontology == ontology)
 
         query_lower = query.lower()
         name_lower = func.lower(Tag.name)
@@ -348,9 +344,6 @@ class TagQuery:
                 else:
                     trigram_base = trigram_base.filter(Tag.vocabulary_id.isnot(None))
 
-                if ontology is not None:
-                    trigram_base = trigram_base.filter(tag_table.c.ontology == ontology)
-
                 trigram_q = trigram_base.filter(similarity >= cls.close_match_similarity)
 
                 if seen_ids:
@@ -391,9 +384,6 @@ class TagQuery:
                 candidates_base = candidates_base.filter(Tag.vocabulary_id == vocabulary_id)
             else:
                 candidates_base = candidates_base.filter(Tag.vocabulary_id.isnot(None))
-
-            if ontology is not None:
-                candidates_base = candidates_base.filter(tag_table.c.ontology == ontology)
 
             if seen_ids:
                 candidates_base = candidates_base.filter(~Tag.id.in_(seen_ids))
@@ -496,10 +486,10 @@ class OntologyManager:
                 update_values = {}
                 if existing.vocabulary_id != vocabulary_id:
                     update_values['vocabulary_id'] = vocabulary_id
+                iri = term.get('iri')
+                if iri is not None:
+                    update_values['iri'] = iri
                 if refresh_existing:
-                    iri = term.get('iri')
-                    if iri is not None:
-                        update_values['iri'] = iri
                     update_values['ontology'] = ontology_value
                     update_values['label'] = label
                 if update_values:
@@ -569,13 +559,12 @@ class OntologyManager:
         return [{'id': v.id, 'name': v.name} for v in vocabs]
     
     @classmethod
-    def search_terms(cls, query, ontology_name=None, limit=10):
+    def search_terms(cls, query, limit=10, vocabulary_id=None):
         """
         Search for terms across ontologies.
 
         :param query: the search string
-        :param ontology_name: optional ontology name to filter by (e.g., 'oeo', 'envo')
         :param limit: maximum number of results (default: 10)
         :return: list of matching tag records
         """
-        return TagQuery.search(query, vocabulary_id=None, ontology=ontology_name, limit=limit)
+        return TagQuery.search(query, vocabulary_id=vocabulary_id, limit=limit)
