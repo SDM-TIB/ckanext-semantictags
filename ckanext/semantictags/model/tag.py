@@ -98,4 +98,5 @@ def init_table():
     extend_tag_model()
 
 
+extend_tag_model()
 __all__ = ['Tag', 'tag_table', 'add_iri_column', 'add_ontology_column', 'add_label_column', 'init_table']
