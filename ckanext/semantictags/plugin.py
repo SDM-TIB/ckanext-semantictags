@@ -45,8 +45,7 @@ def autocomplete_term(context, data_dict):
 
     res = OntologyManager.search_terms(query, limit=limit, vocabulary_id=vocab.id)
 
-    # Return label if available, otherwise fall back to name
-    return [getattr(t, 'label', None) or t.name for t in res]
+    return [t.name for t in res]
 
 
 @toolkit.side_effect_free
@@ -112,11 +111,20 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IActions) 
     plugins.implements(plugins.IBlueprint)
     plugins.implements(plugins.IClick)
+    plugins.implements(plugins.IPackageController, inherit=True)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         tag_model.init_table()
         # generate_tag_vocabulary()
+
+    def before_create(self, context, data_dict):
+        resolve_vocab_tags(data_dict)
+        return data_dict
+
+    def before_update(self, context, data_dict):
+        resolve_vocab_tags(data_dict)
+        return data_dict
 
     def get_commands(self):
         return cli.get_commands()

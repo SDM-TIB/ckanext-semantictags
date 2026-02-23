@@ -270,6 +270,26 @@ class TagQuery:
         return count
 
     @classmethod
+    def cleanup_tags(cls):
+        if not cls.tables_ready():
+            return 0
+        result = Session.execute(
+            text("""
+                DELETE FROM tag
+                WHERE vocabulary_id IS NULL
+                AND ontology IS NULL
+                AND NOT EXISTS (
+                    SELECT 1 FROM package_tag WHERE package_tag.tag_id = tag.id
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM package_tag_revision WHERE package_tag_revision.tag_id = tag.id
+                )
+            """)
+        )
+        Session.commit()
+        return result.rowcount
+
+    @classmethod
     def list_(cls, vocabulary_id):
         """
         List all tags in a vocabulary.
@@ -469,7 +489,8 @@ class OntologyManager:
             ontology_value = term.get('ontology') or ontology_name
             existing = Session.query(Tag.id, Tag.vocabulary_id).filter(
                 Tag.name == name,
-                tag_table.c.ontology == ontology_value
+                tag_table.c.ontology == ontology_value,
+                (Tag.vocabulary_id == vocabulary_id) | (Tag.vocabulary_id.is_(None))
             ).first()
             if existing:
                 update_values = {}
@@ -486,6 +507,57 @@ class OntologyManager:
                         tag_table.update().where(tag_table.c.id == existing.id).values(**update_values)
                     )
                     Session.commit()
+                continue
+            raw_existing = Session.query(Tag.id, Tag.vocabulary_id).filter(
+                Tag.name == label,
+                (tag_table.c.ontology == ontology_value) | (tag_table.c.ontology.is_(None)),
+                (Tag.vocabulary_id == vocabulary_id) | (Tag.vocabulary_id.is_(None))
+            ).first()
+            if raw_existing:
+                munged_existing = Session.query(Tag.id).filter(Tag.name == name).first()
+                if munged_existing and munged_existing.id != raw_existing.id:
+                    used = Session.execute(
+                        text("""
+                            SELECT 1 FROM package_tag
+                            WHERE tag_id = :tag_id
+                            AND state = 'active'
+                            LIMIT 1
+                        """),
+                        {'tag_id': munged_existing.id}
+                    ).first()
+                    if not used:
+                        Session.execute(
+                            tag_table.delete().where(tag_table.c.id == munged_existing.id)
+                        )
+                        Session.commit()
+                    else:
+                        update_values = {}
+                        if raw_existing.vocabulary_id != vocabulary_id:
+                            update_values['vocabulary_id'] = vocabulary_id
+                        iri = term.get('iri')
+                        if iri is not None:
+                            update_values['iri'] = iri
+                        update_values['ontology'] = ontology_value
+                        update_values['label'] = label
+                        if update_values:
+                            Session.execute(
+                                tag_table.update().where(tag_table.c.id == raw_existing.id).values(**update_values)
+                            )
+                            Session.commit()
+                        continue
+                update_values = {}
+                update_values['name'] = name
+                if raw_existing.vocabulary_id != vocabulary_id:
+                    update_values['vocabulary_id'] = vocabulary_id
+                iri = term.get('iri')
+                if iri is not None:
+                    update_values['iri'] = iri
+                update_values['ontology'] = ontology_value
+                update_values['label'] = label
+                Session.execute(
+                    tag_table.update().where(tag_table.c.id == raw_existing.id).values(**update_values)
+                )
+                Session.commit()
                 continue
             try:
                 TagQuery.create(

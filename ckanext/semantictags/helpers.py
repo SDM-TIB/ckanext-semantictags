@@ -56,8 +56,8 @@ def resolve_vocab_tags(data_dict):
     if not tags:
         return
 
-    vocab_name = config.get('ldm_tags.vocabulary_name', 'oeo')
-    vocab = VocabularyQuery.read_name(vocab_name)
+    tags_util = LDM_tags_util()
+    vocab = VocabularyQuery.read_name(tags_util.vocabulary_name_default)
     if not vocab:
         return
 
@@ -65,7 +65,7 @@ def resolve_vocab_tags(data_dict):
     for tag in tags:
         if isinstance(tag, str):
             tag = {'name': tag}
-        name = tag.get('name')
+        name = tag.get('name') or tag.get('display_name') or tag.get('label') or tag.get('value')
         if not name:
             continue
         munged = munge_tag(name)
