@@ -1,13 +1,13 @@
+import logging
 import requests
 
-import logging
+from ckan.common import config
+from ckan.lib.munge import munge_tag
+from ckan.plugins.toolkit import asbool
+from ckanext.semantictags.model.crud import OntologyManager, TagQuery, VocabularyQuery
+
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
-
-from ckan.common import config
-from ckan.plugins.toolkit import asbool
-from ckan.lib.munge import munge_tag
-from ckanext.semantictags.model.crud import OntologyManager, TagQuery, VocabularyQuery
 
 API_URL = 'https://api.terminology.tib.eu/api/v2/ontologies/{onto}/classes'
 ONTOLOGIES_KEY = 'ckanext.semantictags.ontologies'
@@ -88,8 +88,7 @@ def generate_tag_vocabulary(ontologies=None):
     tags_util.create_vocabulary(ontologies=ontologies)
 
 
-class LDM_tags_util():
-
+class LDM_tags_util:
     def __init__(self):
         log.debug('Inside the Tag Plugin')
 

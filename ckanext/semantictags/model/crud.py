@@ -1,6 +1,6 @@
 from ckan.model import Session
 import logging
-from difflib import SequenceMatcher
+from collections import Counter
 from sqlalchemy import case, func, text
 from sqlalchemy.exc import ProgrammingError
 from ckanext.semantictags.model.vocabulary import Vocabulary, vocabulary_table
@@ -108,8 +108,44 @@ class TagQuery:
     m = Tag
     cols = [c.name for c in tag_table.c]
     close_match_similarity = 0.3
-    close_match_ratio = 0.6
     close_match_candidate_limit = 1000
+    _row_columns = (
+        Tag.id,
+        Tag.name,
+        Tag.vocabulary_id,
+        tag_table.c.iri,
+        tag_table.c.ontology,
+        tag_table.c.label,
+    )
+
+    @classmethod
+    def _row_to_tag(cls, row):
+        if row is None:
+            return None
+        tag = Tag(name=row.name, vocabulary_id=row.vocabulary_id)
+        tag.id = row.id
+        tag.iri = row.iri
+        tag.ontology = row.ontology
+        tag.label = row.label
+        return tag
+
+    @staticmethod
+    def _trigrams(text):
+        if text is None:
+            return []
+        padded = f"  {text}  "
+        return [padded[i:i + 3] for i in range(len(padded) - 2)]
+
+    @classmethod
+    def _trigram_similarity(cls, left, right):
+        left_tris = cls._trigrams(left)
+        right_tris = cls._trigrams(right)
+        if not left_tris or not right_tris:
+            return 0.0
+        left_counts = Counter(left_tris)
+        right_counts = Counter(right_tris)
+        shared = sum((left_counts & right_counts).values())
+        return (2.0 * shared) / (len(left_tris) + len(right_tris))
 
     @classmethod
     def _pg_trgm_enabled(cls):
@@ -136,8 +172,7 @@ class TagQuery:
         :param label: the original display label (optional)
         :return: the newly created record object
         """
-        # TODO: replace problematic characters
-
+        
         new_record = Tag(name=name, vocabulary_id=vocabulary_id)
         Session.add(new_record)
         Session.flush()
@@ -166,26 +201,8 @@ class TagQuery:
         :param identifier: the tag id (UUID)
         :return: the record object
         """
-        row = Session.query(
-            Tag.id,
-            Tag.name,
-            Tag.vocabulary_id,
-            tag_table.c.iri,
-            tag_table.c.ontology,
-            tag_table.c.label
-        ).filter(Tag.id == identifier).first()
-
-        if row is None:
-            return None
-
-        # Create Tag object with all attributes
-        tag = Tag(name=row[1], vocabulary_id=row[2])
-        tag.id = row[0]
-        tag.iri = row[3]
-        tag.ontology = row[4]
-        tag.label = row[5]
-
-        return tag
+        row = Session.query(*cls._row_columns).filter(Tag.id == identifier).first()
+        return cls._row_to_tag(row)
     
     @classmethod
     def read_name(cls, name, vocabulary_id=None):
@@ -279,14 +296,7 @@ class TagQuery:
         if not query:
             return []
 
-        base = Session.query(
-            Tag.id,
-            Tag.name,
-            Tag.vocabulary_id,
-            tag_table.c.iri,
-            tag_table.c.ontology,
-            tag_table.c.label
-        )
+        base = Session.query(*cls._row_columns)
     
         if vocabulary_id is not None:
             base = base.filter(Tag.vocabulary_id == vocabulary_id)
@@ -317,7 +327,7 @@ class TagQuery:
             .all()
         )
 
-        results = list(initial)
+        results = [cls._row_to_tag(row) for row in initial]
         if len(results) >= limit:
             return results
 
@@ -330,14 +340,7 @@ class TagQuery:
                 label_or_name = func.coalesce(tag_table.c.label, Tag.name)
                 similarity = func.similarity(func.lower(label_or_name), query_lower)
 
-                trigram_base = Session.query(
-                    Tag.id,
-                    Tag.name,
-                    Tag.vocabulary_id,
-                    tag_table.c.iri,
-                    tag_table.c.ontology,
-                    tag_table.c.label
-                )
+                trigram_base = Session.query(*cls._row_columns)
 
                 if vocabulary_id is not None:
                     trigram_base = trigram_base.filter(Tag.vocabulary_id == vocabulary_id)
@@ -356,11 +359,7 @@ class TagQuery:
                 ).limit(remaining).all()
 
                 for row in trigram_rows:
-                    tag = Tag(name=row[1], vocabulary_id=row[2])
-                    tag.id = row[0]
-                    tag.iri = row[3]
-                    tag.ontology = row[4]
-                    tag.label = row[5]
+                    tag = cls._row_to_tag(row)
                     results.append(tag)
                     seen_ids.add(tag.id)
 
@@ -369,16 +368,9 @@ class TagQuery:
             except ProgrammingError:
                 Session.rollback()
 
-        # Fallback: use difflib SequenceMatcher
+        # Fallback: approximate pg_trgm similarity in Python
         if remaining > 0:
-            candidates_base = Session.query(
-                Tag.id,
-                Tag.name,
-                Tag.vocabulary_id,
-                tag_table.c.iri,
-                tag_table.c.ontology,
-                tag_table.c.label
-            )
+            candidates_base = Session.query(*cls._row_columns)
 
             if vocabulary_id is not None:
                 candidates_base = candidates_base.filter(Tag.vocabulary_id == vocabulary_id)
@@ -395,22 +387,18 @@ class TagQuery:
                 tag_id, name, vocab_id, iri, ont, label = row
                 # Use label for matching, fall back to name if label is None
                 search_text = (label or name or "").lower()
-                if search_text:  # Only compare if we have text
-                    ratio = SequenceMatcher(None, query_lower, search_text).ratio()
-                    if ratio >= cls.close_match_ratio:
-                        scored.append((ratio, row))
+                if not search_text:
+                    continue
+                similarity = cls._trigram_similarity(query_lower, search_text)
+                if similarity >= cls.close_match_similarity:
+                    scored.append((similarity, len(search_text), search_text, row))
 
             if scored:
-                scored.sort(reverse=True, key=lambda x: x[0])
-                top_rows = [row for _, row in scored[:remaining]]
+                scored.sort(reverse=True)
+                top_rows = [row for _, _, _, row in scored[:remaining]]
 
                 for row in top_rows:
-                    tag = Tag(name=row[1], vocabulary_id=row[2])
-                    tag.id = row[0]
-                    tag.iri = row[3]
-                    tag.ontology = row[4]
-                    tag.label = row[5]
-                    results.append(tag)
+                    results.append(cls._row_to_tag(row))
 
         return results
         
@@ -452,6 +440,7 @@ class OntologyManager:
 
         :param ontology_name: name of the ontology (e.g., 'oeo')
         :param terms: list of dicts with 'label' and 'iri' keys
+        :param refresh_existing: whether to update existing tags for the ontology
         :return: the vocabulary record
         """
 

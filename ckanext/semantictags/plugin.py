@@ -1,16 +1,13 @@
+import logging
+from flask import Blueprint, request
 import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
-from flask import Blueprint, request
 from ckan.common import config
-d = toolkit.g
-
-import logging
-log = logging.getLogger(__name__)
-log.setLevel(logging.DEBUG)
-
 import ckan.lib.base as base
 import ckan.logic as logic
 import ckan.model as model
+log = logging.getLogger(__name__)
+log.setLevel(logging.DEBUG)
 from ckan.logic.action.create import package_create as core_package_create
 from ckan.logic.action.update import package_update as core_package_update
 from ckan.logic.action.get import package_show as core_package_show
@@ -21,7 +18,7 @@ from ckanext.semantictags.model.crud import OntologyManager, TagQuery, Vocabular
 from ckanext.semantictags.model import tag as tag_model
 from ckan.plugins.toolkit import asbool
 from ckanext.semantictags import cli
-from ckanext.semantictags.helpers import API_URL, ONTOLOGIES_KEY, FREE_TAGS_KEY, FORCE_RELOAD_KEY, get_terms_by_ontology, generate_tag_vocabulary, LDM_tags_util, resolve_vocab_tags
+from ckanext.semantictags.helpers import ONTOLOGIES_KEY, FREE_TAGS_KEY, FORCE_RELOAD_KEY, generate_tag_vocabulary, LDM_tags_util, resolve_vocab_tags
 
 
 @toolkit.side_effect_free
@@ -29,15 +26,14 @@ def autocomplete_term(context, data_dict):
     """
     Autocomplete tags from ontologies.
 
-    :param q: partial query string
+    :param q: partial query string (preferred)
     :type q: str
+    :param incomplete: partial query string (fallback)
+    :type incomplete: str
     :param limit: maximum number of results (default 10)
     :type limit: int
-    :param ontology: name of the ontology to check (by default all are considered)
-    :type ontology: str
 
-    :returns: JSON in the same format as CKAN util autocomplete:
-              ["Tag 1", "Tag 2", "...", "Tag n"]
+    :returns: list of tag labels/names, e.g. ["Tag 1", "Tag 2", "..."]
     """
     query = data_dict.get('q') or data_dict.get('incomplete', '')
     limit = int(data_dict.get('limit') or 10)
@@ -142,9 +138,7 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
         return schema
 
     def get_helpers(self):
-        """Register the most_popular_groups() function above as a template
-        helper function.
-        """
+        """Register SemanticTags template helpers."""
         # Template helper function names should begin with the name of the
         # extension they belong to, to avoid clashing with functions from
         # other extensions.

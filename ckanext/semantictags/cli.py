@@ -1,10 +1,8 @@
 import logging
-
 import ckan.model as model
 import ckan.plugins.toolkit as toolkit
 from ckan.common import config
 import click
-#from ckan.types import Context
 from typing import Dict, Any
 Context = Dict[str, Any]
 from ckanext.semantictags.helpers import get_terms_by_ontology, FREE_TAGS_KEY, FORCE_RELOAD_KEY, generate_tag_vocabulary, LDM_tags_util

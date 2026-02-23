@@ -1,65 +1,48 @@
 import logging
 
-from ckan.model import Session
-from ckan.model.tag import Tag, tag_table
 from sqlalchemy import Column, UnicodeText
 from sqlalchemy.orm import configure_mappers
 
+from ckan.model import Session
+from ckan.model.tag import Tag, tag_table
+
 log = logging.getLogger(__name__)
+
+
+def _add_column(column_name):
+    result = Session.execute("""
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'tag' AND column_name = :column_name
+    """, {'column_name': column_name})
+
+    if result.fetchone() is None:
+        Session.execute(f'ALTER TABLE tag ADD COLUMN {column_name} TEXT')
+        Session.commit()
+        log.info('Added %s column to tag table', column_name)
+        return True
+    return False
 
 
 def add_iri_column():
     """
     Add iri column to CKAN's existing tag table
     """
-    result = Session.execute("""
-        SELECT 1
-        FROM information_schema.columns
-        WHERE table_name = 'tag' AND column_name = 'iri'
-    """)
-
-    if result.fetchone() is None:
-        Session.execute('ALTER TABLE tag ADD COLUMN iri TEXT')
-        Session.commit()
-        log.info('Added iri column to tag table')
-        return True
-    return False
+    return _add_column('iri')
 
 
 def add_ontology_column():
     """
     Add ontology column to CKAN's existing tag table
     """
-    result = Session.execute("""
-        SELECT 1
-        FROM information_schema.columns
-        WHERE table_name = 'tag' AND column_name = 'ontology'
-    """)
-
-    if result.fetchone() is None:
-        Session.execute('ALTER TABLE tag ADD COLUMN ontology TEXT')
-        Session.commit()
-        log.info('Added ontology column to tag table')
-        return True
-    return False
+    return _add_column('ontology')
 
 
 def add_label_column():
     """
     Add label column to CKAN's existing tag table
     """
-    result = Session.execute("""
-        SELECT 1
-        FROM information_schema.columns
-        WHERE table_name = 'tag' AND column_name = 'label'
-    """)
-
-    if result.fetchone() is None:
-        Session.execute('ALTER TABLE tag ADD COLUMN label TEXT')
-        Session.commit()
-        log.info('Added label column to tag table')
-        return True
-    return False
+    return _add_column('label')
 
 
 def extend_tag_model():
