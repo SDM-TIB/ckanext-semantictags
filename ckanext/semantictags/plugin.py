@@ -45,7 +45,8 @@ def autocomplete_term(context, data_dict):
 
     res = OntologyManager.search_terms(query, limit=limit, vocabulary_id=vocab.id)
 
-    return [t.name for t in res]
+    # Return label if available, otherwise fall back to name
+    return [getattr(t, 'label', None) or t.name for t in res]
 
 
 @toolkit.side_effect_free
