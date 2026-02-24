@@ -1,10 +1,9 @@
 import logging
 
-from sqlalchemy import Column, UnicodeText
-from sqlalchemy.orm import configure_mappers
-
 from ckan.model import Session
 from ckan.model.tag import Tag, tag_table
+from sqlalchemy import Column, UnicodeText
+from sqlalchemy.orm import configure_mappers
 
 log = logging.getLogger(__name__)
 

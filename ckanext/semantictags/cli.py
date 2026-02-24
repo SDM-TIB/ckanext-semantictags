@@ -1,10 +1,9 @@
 import logging
+
 import ckan.model as model
 import ckan.plugins.toolkit as toolkit
-from ckan.common import config
 import click
-from typing import Dict, Any
-Context = Dict[str, Any]
+
 from ckanext.semantictags.helpers import get_terms_by_ontology, FREE_TAGS_KEY, FORCE_RELOAD_KEY, generate_tag_vocabulary, LDM_tags_util
 from ckanext.semantictags.model import tag as tag_model
 from ckanext.semantictags.model.crud import OntologyManager, TagQuery, VocabularyQuery
@@ -13,7 +12,7 @@ log = logging.getLogger(__name__)
 
 
 def _ensure_default(key, default_value):
-    context: Context = {
+    context = {
         'ignore_auth': True,
         'model': model,
         'session': model.Session

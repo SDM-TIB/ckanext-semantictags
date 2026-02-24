@@ -1,9 +1,10 @@
 import logging
-import requests
 
+import requests
 from ckan.common import config
 from ckan.lib.munge import munge_tag
 from ckan.plugins.toolkit import asbool
+
 from ckanext.semantictags.model.crud import OntologyManager, TagQuery, VocabularyQuery
 
 log = logging.getLogger(__name__)

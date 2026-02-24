@@ -1,11 +1,13 @@
-from ckan.model import Session
 import logging
 from collections import Counter
+
+from ckan.lib.munge import munge_tag
+from ckan.model import Session
 from sqlalchemy import case, func, text
 from sqlalchemy.exc import ProgrammingError
-from ckanext.semantictags.model.vocabulary import Vocabulary, vocabulary_table
+
 from ckanext.semantictags.model.tag import Tag, tag_table
-from ckan.lib.munge import munge_tag
+from ckanext.semantictags.model.vocabulary import Vocabulary, vocabulary_table
 
 log = logging.getLogger(__name__)
 
