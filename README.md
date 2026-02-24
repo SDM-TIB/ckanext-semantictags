@@ -2,7 +2,8 @@
 
 # Semantic Tags
 
-`ckanext-semantictags` is a CKAN plugin that adds support for ontology-backed keywords for your datasets.
+`ckanext-semantictags` is a CKAN extension that adds support for ontology-backed keywords for your datasets.
+The extension reads the ontologies from the [TIB-hosted Terminology Service](https://terminology.tib.eu/ts/). 
 
 ## Installation
 
@@ -16,7 +17,43 @@ pip install -r ./ckanext-semantictags/requirements.txt
 
 ## Configuration Options
 
-TODO: Add configuration options 
+- `ckanext.semantictags.ontologies` the ontologies to use for semantic tag suggestions
+  - Default: (none)
+- `ckanext.semantictags.allow_free_tags` whether to allow free-text tags in addition to ontology-based tags
+  - Default: `false`
+- `ckanext.semantictags.force_reload` whether to force a reload of the ontologies on startup, instead of using the cached version
+  - Default: `false`
+
+## Usage
+
+In order to initialize the extension, add the following to your start-up scripts, assuming `$CKAN_INI` is the path of your CKAN configuration file:
+
+```bash
+ckan config-tool -s app:main $CKAN_INI "ckanext.semantictags.ontologies = YOUR_ONTOLOGY_SHORT_NAME"
+ckan -c $CKAN_INI semantictags init --free-tags
+```
+
+Replace `YOUR_ONTOLOGY_SHORT_NAME` with the short name(s) of the ontology/ontologies you want to use, e.g. `oeo` for energy systems research related terms.
+
+If you are using `ckanext-scheming`, change your `tag_string` field declaration to:
+```yaml
+- field_name: tag_string
+  label: Tags
+  form_snippet: form_snippets/semantictags_autocomplete.html
+```
+
+## Commands
+
+`ckanext-semantictags` offers the following commands, assuming `$CKAN_INI` is the path of your CKAN configuration file:
+
+1. `init`: initializes the `ckanext-semantictags` runtime data: sets up the database table, ensures default configuration options are set, and generates the tag vocabulary.
+   ```bash
+   ckan -c $CKAN_INI semantictags init
+   ```
+   Optionally, default values for `allow_free_tags` and `force_reload` can be set to `true` via flags. These are only applied if no value was previously set in the CKAN configuration — existing configuration values take precedence.
+   ```bash
+   ckan -c $CKAN_INI semantictags init --free-tags --force-reload
+   ```
 
 ## Changelog
 
