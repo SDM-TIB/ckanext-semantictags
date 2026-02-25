@@ -23,6 +23,13 @@ this.ckan.module('semantictags-tag-popup', function ($) {
     _onEnter: function (e) {
       this._showTooltip(e);
 
+      if (!this.options.iri) {
+        this._fetchState = 'done';
+        this._data = null;
+        this._updateTooltipContent(this._renderNoInfo());
+        return;
+      }
+
       if (this._fetchState === 'idle') {
         this._fetchState = 'loading';
         this._updateTooltipContent(this._renderLoading());
@@ -30,6 +37,12 @@ this.ckan.module('semantictags-tag-popup', function ($) {
       } else if (this._fetchState === 'done' || this._fetchState === 'error') {
         this._updateTooltipContent(this._renderData());
       }
+    },
+
+    _renderNoInfo: function () {
+      return $('<div>')
+        .addClass('semantictags-tooltip__no-info')
+        .text('No ontology information available.');
     },
 
     _onLeave: function () {

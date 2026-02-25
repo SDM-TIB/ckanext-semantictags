@@ -13,6 +13,11 @@
   line-height: 1.5;
 }
 
+.semantictags-tooltip__no-info {
+  color: #999;
+  font-style: italic;
+}
+
 .semantictags-tooltip__loading,
 .semantictags-tooltip__error {
   color: #999;
