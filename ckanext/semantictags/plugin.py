@@ -48,8 +48,12 @@ def autocomplete_term(context, data_dict):
 
     res = OntologyManager.search_terms(query, limit=limit, vocabulary_id=vocab.id)
 
-    # Return label if available, otherwise fall back to name
-    return [getattr(t, 'label', None) or t.name for t in res]
+    results = []
+    for t in res:
+        label = getattr(t, 'label', None) or t.name
+        ontology = getattr(t, 'ontology', '') or ''
+        results.append({'id': label, 'text': label, 'ontology': ontology})
+    return results
 
 
 @toolkit.side_effect_free
@@ -135,7 +139,7 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
 
     def update_config(self, config_):
         toolkit.add_template_directory(config_, 'templates')
-        toolkit.add_public_directory(config_, 'public')
+        toolkit.add_resource('static', 'semantictags')
         toolkit.add_ckan_admin_tab(config_, 'semantictags.admin', 'SemanticTags', icon='tags')
 
     def update_config_schema(self, schema):

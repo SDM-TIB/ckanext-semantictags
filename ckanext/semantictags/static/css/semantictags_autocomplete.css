@@ -1,0 +1,16 @@
+.semantictags-result {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.semantictags-result__label {
+  flex: 1;
+}
+
+.semantictags-result__ontology {
+  font-size: 0.75rem;
+  color: #999;
+  margin-left: 12px;
+  white-space: nowrap;
+}

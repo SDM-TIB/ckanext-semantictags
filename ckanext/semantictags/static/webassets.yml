@@ -1,0 +1,13 @@
+semantictags-autocomplete-css:
+  output: semantictags/semantictags_autocomplete.css
+  contents:
+    - css/semantictags_autocomplete.css
+
+semantictags-autocomplete:
+  output: semantictags/semantictags_autocomplete.js
+  filters: rjsmin
+  contents:
+    - js/semantictags_autocomplete.js
+  extra:
+    preload:
+      - base/main
