@@ -10,6 +10,7 @@ this.ckan.module('semantictags-tag-popup', function ($) {
       this._tooltip = null;
       this._fetchState = 'idle'; // idle | loading | done | error
       this._data = null;
+      this._apiBase = this.sandbox.client.endpoint;
 
       this.el.on('mouseenter', function (e) { self._onEnter(e); });
       this.el.on('mouseleave', function () { self._onLeave(); });
@@ -60,7 +61,7 @@ this.ckan.module('semantictags-tag-popup', function ($) {
       }
 
       $.ajax({
-        url: '/api/3/action/semantictags_term_details',
+        url: this._apiBase + '/api/3/action/semantictags_term_details',
         data: { iri: iri },
         dataType: 'json',
         success: function (response) {

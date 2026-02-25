@@ -11,6 +11,7 @@ this.ckan.module('semantictags-autocomplete', function ($) {
       var source = this.options.source || '';
       var allowCreate = String(this.options.createtags).toLowerCase() === 'true';
       var baseUrl = source.split('?')[0];
+      var apiBase = this.sandbox.client.endpoint;
 
       this.el.select2({
         width: 'resolve',
@@ -27,7 +28,7 @@ this.ckan.module('semantictags-autocomplete', function ($) {
         } : undefined,
 
         ajax: {
-          url: baseUrl,
+          url: apiBase + baseUrl,
           dataType: 'json',
           quietMillis: 200,
           data: function (term) {
