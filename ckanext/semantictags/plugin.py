@@ -5,6 +5,7 @@ import ckan.logic as logic
 import ckan.model as model
 import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
+import requests as http_requests
 from ckan.common import config
 from ckan.logic.action.create import package_create as core_package_create
 from ckan.logic.action.get import package_show as core_package_show
@@ -22,6 +23,54 @@ NotFound = logic.NotFound
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
+
+TIB_TS_API = 'https://api.terminology.tib.eu/api/v2'
+
+
+@toolkit.side_effect_free
+def term_details(context, data_dict):
+    """
+    Fetch term details from TIB Terminology Service (OLS4 v2) by IRI.
+
+    :param iri: the term IRI
+    :type iri: str
+
+    :returns: dict with label, iri, ontology_name, ontology_title, definition
+    """
+    iri = data_dict.get('iri', '').strip()
+    if not iri:
+        raise toolkit.ValidationError({'iri': ['Missing value']})
+
+    try:
+        term_resp = http_requests.get(
+            f'{TIB_TS_API}/entities',
+            params={'iri': iri, 'size': 1},
+            timeout=5
+        )
+        term_resp.raise_for_status()
+        term_data = term_resp.json()
+
+        elements = term_data.get('elements', [])
+        if not elements:
+            return {'error': 'Term not found'}
+
+        term = elements[0]
+        ontology_id = term.get('ontologyId', '')
+
+        description = term.get('definition') or []
+        definition = description[0] if description else None
+
+        return {
+            'label': term.get('label'),
+            'iri': term.get('iri'),
+            'curie': term.get('curie'),
+            'ontology_name': ontology_id,
+            'definition': definition,
+        }
+
+    except http_requests.RequestException as e:
+        log.warning(f'TIB TS request failed for IRI {iri}: {e}')
+        return {'error': 'Terminology service unavailable'}
 
 
 @toolkit.side_effect_free
@@ -167,6 +216,7 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
     def get_actions(self):
         return {
             'semantictags_autocomplete': autocomplete_term,
+            'semantictags_term_details': term_details,
             'package_show': package_show, 
             'package_create': package_create,
             'package_update': package_update

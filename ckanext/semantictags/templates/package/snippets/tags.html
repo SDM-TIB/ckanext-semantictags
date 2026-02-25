@@ -1,0 +1,17 @@
+{% asset 'semantictags/semantictags-tag-popup-css' %}
+{% asset 'semantictags/semantictags-tag-popup' %}
+
+{% if tags %}
+  <ul class="tag-list well">
+    {% for tag in tags %}
+      <li>
+        <a href="{{ h.url_for('dataset.search', tags=tag.name) }}"
+           class="tag"
+           data-module="semantictags-tag-popup"
+           data-module-iri="{{ tag.iri or '' }}">
+          {{ tag.display_name | truncate(22, killwords=True, end='…') }}
+        </a>
+      </li>
+    {% endfor %}
+  </ul>
+{% endif %}

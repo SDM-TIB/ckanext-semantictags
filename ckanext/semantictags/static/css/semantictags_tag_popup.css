@@ -1,0 +1,58 @@
+.semantictags-tooltip {
+  position: absolute;
+  z-index: 9999;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  padding: 10px 14px;
+  max-width: 340px;
+  min-width: 200px;
+  pointer-events: none;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.semantictags-tooltip__loading,
+.semantictags-tooltip__error {
+  color: #999;
+}
+
+.semantictags-tooltip__error {
+  color: #c0392b;
+}
+
+.semantictags-tooltip__row {
+  margin-bottom: 4px;
+}
+
+.semantictags-tooltip__row:last-child {
+  margin-bottom: 0;
+}
+
+.semantictags-tooltip__key {
+  font-weight: bold;
+  color: #222;
+}
+
+.semantictags-tooltip__value {
+  color: #444;
+}
+
+.semantictags-tooltip__badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.8rem;
+  font-family: monospace;
+}
+
+.semantictags-tooltip__badge--curie {
+  background-color: #eaf1fb;
+  color: #2471a3;
+}
+
+.semantictags-tooltip__badge--ontology {
+  background-color: #eafaf1;
+  color: #1e8449;
+}
