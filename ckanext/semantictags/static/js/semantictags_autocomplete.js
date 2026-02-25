@@ -9,13 +9,22 @@ this.ckan.module('semantictags-autocomplete', function ($) {
     initialize: function () {
       var self = this;
       var source = this.options.source || '';
-      var allowCreate = this.options.createtags === 'true' || this.options.createtags === true;
+      var allowCreate = String(this.options.createtags).toLowerCase() === 'true';
       var baseUrl = source.split('?')[0];
 
       this.el.select2({
         width: 'resolve',
         tags: allowCreate,
         tokenSeparators: [','],
+
+        createSearchChoice: allowCreate ? function (term, data) {
+          var exists = $(data).filter(function () {
+            return this.text.localeCompare(term) === 0;
+          }).length;
+          if (!exists) {
+            return { id: term, text: term };
+          }
+        } : undefined,
 
         ajax: {
           url: baseUrl,
@@ -40,10 +49,10 @@ this.ckan.module('semantictags-autocomplete', function ($) {
           var ontology = self._escapeHtml(item.ontology || '');
           if (ontology) {
             return (
-              '<span class="semantictags-result">' +
+                '<span class="semantictags-result">' +
                 '<span class="semantictags-result__label">' + label + '</span>' +
                 '<span class="semantictags-result__ontology">' + ontology + '</span>' +
-              '</span>'
+                '</span>'
             );
           }
           return '<span class="semantictags-result__label">' + label + '</span>';
@@ -70,10 +79,10 @@ this.ckan.module('semantictags-autocomplete', function ($) {
 
     _escapeHtml: function (str) {
       return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
     },
   };
 });
