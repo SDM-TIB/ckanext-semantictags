@@ -107,8 +107,7 @@ def autocomplete_term(context, data_dict):
 @toolkit.side_effect_free
 def suggest_tags_from_text(context, data_dict):
     """
-    Skeleton action: suggest tags from description text.
-    Real implementation will call the annotator service and return structured suggestions.
+    Suggest tags from description text using NFDI4Energy Annotator API.
     """
     text = data_dict.get('text', '').strip()
     if not text:
