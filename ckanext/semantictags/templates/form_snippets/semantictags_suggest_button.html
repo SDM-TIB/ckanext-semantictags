@@ -1,0 +1,22 @@
+{% asset 'semantictags/semantictags-suggest' %}
+{% asset 'semantictags/semantictags-clear-tags' %}
+
+<div class="form-group" style="margin-top: 10px;">
+  <div style="display: flex; gap: 5px; align-items: center;">
+    <div data-module="semantictags-suggest" 
+         data-module-notes-field-selector="#field-notes"
+         data-module-tag-string-field-selector="#field-tags"
+         data-module-button-text="{% trans %}Suggest Tags{% endtrans %}">
+      <button type="button" class="btn btn-default semantictags-suggest-btn">
+        {% trans %}Suggest Tags{% endtrans %}
+      </button>
+    </div>
+    <div data-module="semantictags-clear-tags" 
+         data-module-tag-string-field-selector="#field-tags"
+         data-module-button-text="{% trans %}Clear Tags{% endtrans %}">
+      <button type="button" class="btn btn-default semantictags-clear-tags-btn">
+        {% trans %}Clear Tags{% endtrans %}
+      </button>
+    </div>
+  </div>
+</div>
