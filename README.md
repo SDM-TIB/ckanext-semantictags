@@ -42,6 +42,26 @@ If you are using `ckanext-scheming`, change your `tag_string` field declaration 
   form_snippet: form_snippets/semantictags_autocomplete.html
 ```
 
+### Suggest Tags from Description
+
+To enable automatic tag suggestions based on dataset descriptions, add the `suggest_tags_section` field to your `ckanext-scheming` configuration. Place it **above** the `tag_string` field:
+
+```yaml
+- field_name: suggest_tags_section
+  label: Tag Suggestions
+  form_snippet: form_snippets/semantictags_suggest_button.html
+
+- field_name: tag_string
+  label: Tags
+  form_snippet: form_snippets/semantictags_autocomplete.html
+```
+
+This enables two buttons in your dataset form:
+- **Suggest Tags**: analyzes the description text and suggests relevant tags using the [NFDI4Energy Annotator API](https://service.tib.eu/sandbox/nfdi4energyannotator/docs#/)
+- **Clear Tags**: removes all tags with a single click
+
+The suggested tags are filtered to only include terms from the configured ontologies.
+
 ## Commands
 
 `ckanext-semantictags` offers the following commands, assuming `$CKAN_INI` is the path of your CKAN configuration file:
