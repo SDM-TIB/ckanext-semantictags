@@ -104,6 +104,19 @@ def autocomplete_term(context, data_dict):
         results.append({'id': label, 'text': label, 'ontology': ontology})
     return results
 
+@toolkit.side_effect_free
+def suggest_tags_from_text(context, data_dict):
+    """
+    Skeleton action: suggest tags from description text.
+    Real implementation will call the annotator service and return structured suggestions.
+    """
+    text = data_dict.get('text', '').strip()
+    if not text:
+        raise toolkit.ValidationError({'text': ['Missing or empty text']})
+
+    # Return empty suggestions for now (safe placeholder)
+    return {'suggestions': [], 'count': 0}
+
 
 @toolkit.side_effect_free
 def package_show(context, data_dict):
@@ -217,6 +230,7 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
         return {
             'semantictags_autocomplete': autocomplete_term,
             'semantictags_term_details': term_details,
+            'semantictags_suggest_tags': suggest_tags_from_text,
             'package_show': package_show, 
             'package_create': package_create,
             'package_update': package_update
