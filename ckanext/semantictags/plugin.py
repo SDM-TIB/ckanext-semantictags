@@ -114,8 +114,52 @@ def suggest_tags_from_text(context, data_dict):
     if not text:
         raise toolkit.ValidationError({'text': ['Missing or empty text']})
 
-    # Return empty suggestions for now (safe placeholder)
-    return {'suggestions': [], 'count': 0}
+    # determine which ontologies to query (either passed or configured)
+    tags_util = LDM_tags_util()
+    ontology_ids = data_dict.get('ontology_ids') or tags_util.ontologies
+    if not ontology_ids:
+        raise toolkit.ValidationError({'ontology_ids': ['No ontologies configured']})
+
+    try:
+        annotator_response = http_requests.post(
+            'https://service.tib.eu/sandbox/nfdi4energyannotator/annotate',
+            json={
+                'text': text,
+                'ontology_ids': ontology_ids,
+                'max_depth': 0
+            },
+            timeout=30
+        )
+        annotator_response.raise_for_status()
+        data = annotator_response.json()
+
+        matches = data.get('matches', [])
+
+        # only keep matches from the requested ontologies and dedupe by iri
+        ontology_set = set(ontology_ids)
+        seen_iris = {}
+        for match in matches:
+            iri = match.get('iri')
+            ontology = (match.get('ontologyId') or '').lower()
+            if iri and ontology in ontology_set:
+                if iri not in seen_iris or match.get('score', 0) > seen_iris[iri]['score']:
+                    seen_iris[iri] = match
+
+        # build the result list using same field names as term_details
+        suggested_tags = []
+        for match in seen_iris.values():
+            suggested_tags.append({
+                'label': match.get('label', match.get('token', '')),
+                'iri': match.get('iri'),
+                'curie': match.get('curie'),
+                'ontology_name': match.get('ontologyId'),
+            })
+
+        return {'suggestions': suggested_tags, 'count': len(suggested_tags)}
+
+    except http_requests.RequestException as e:
+        log.error(f'Annotator request failed: {e}')
+        return {'error': 'Annotation service unavailable', 'suggestions': []}
 
 
 @toolkit.side_effect_free
