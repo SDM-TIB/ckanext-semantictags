@@ -32,6 +32,16 @@
             </div>
         </form>
     </div>
+    <hr>
+    <div>
+        <form method="POST" action="{{ h.url_for('semantictags.admin') }}">
+            {{ form.select('ckanext.semantictags.tag_suggest', label=_('Tag Suggestion Feature'), options=[{'value': 'true', 'text': _('Enabled')}, {'value': 'false',  'text': _('Disabled')}], selected=tag_suggest, classes=['control-medium'], is_required=true) }}
+            <input type="hidden" name="action" value="tag_suggest">
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" title="{% trans %}Update{% endtrans %}">{% trans %}Update{% endtrans %}</button>
+            </div>
+        </form>
+    </div>
 {% endblock %}
 
 {% block secondary_content %}
@@ -45,6 +55,7 @@
             <p><strong>{% trans %}Ontologies{% endtrans %}:</strong> {% trans %}The short names (seperated by spaces) of the ontologies in the <a href="https://terminology.tib.eu/ts/" target="_blank">TIB Terminology Service</a> that are used for annotating datasets.{% endtrans %}</p>
             <p><strong>{% trans %}Allow Free Tags{% endtrans %}:</strong> {% trans %}Whether to allow users to add their own tags that do not belong to the configured ontologies.{% endtrans %}</p>
             <p><strong>{% trans %}Force Tag Reload{% endtrans %}:</strong> {% trans %}Whether to reload all tags on startup even if the ontology / ontologies are already loaded.{% endtrans %}</p>
+            <p><strong>{% trans %}Tag Suggestion Feature{% endtrans %}</strong> {% trans %}Analyzes the description text and suggests relevant tags using the <a href="https://service.tib.eu/sandbox/nfdi4energyannotator/docs#/" target="_blank">NFDI4Energy Annotator API</a>. The suggested tags are filtered to only include terms from the configured ontologies.{% endtrans %}</p>
         </div>
     </div>
 {% endblock %}

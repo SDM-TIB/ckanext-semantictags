@@ -8,6 +8,7 @@ semantictags-autocomplete:
   filters: rjsmin
   contents:
     - js/semantictags_autocomplete.js
+    - js/semantictags_clear_tags.js
   extra:
     preload:
       - base/main
@@ -17,7 +18,6 @@ semantictags-suggest:
   filters: rjsmin
   contents:
     - js/semantictags_suggest.js
-    - js/semantictags_clear_tags.js
   extra:
     preload:
       - base/main

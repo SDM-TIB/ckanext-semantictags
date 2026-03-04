@@ -14,8 +14,8 @@ from ckan.plugins.toolkit import asbool
 from flask import Blueprint, request
 
 from ckanext.semantictags import cli
-from ckanext.semantictags.helpers import ONTOLOGIES_KEY, FREE_TAGS_KEY, FORCE_RELOAD_KEY, generate_tag_vocabulary, \
-    LDM_tags_util, resolve_vocab_tags
+from ckanext.semantictags.helpers import ONTOLOGIES_KEY, FREE_TAGS_KEY, FORCE_RELOAD_KEY, TAG_SUGGEST_KEY, \
+    generate_tag_vocabulary, LDM_tags_util, resolve_vocab_tags
 from ckanext.semantictags.model import tag as tag_model
 from ckanext.semantictags.model.crud import OntologyManager, TagQuery, VocabularyQuery
 
@@ -206,7 +206,12 @@ def get_available_ontologies():
 
 
 def free_tags_allowed():
-    return config.get(FREE_TAGS_KEY)
+    return asbool(config.get(FREE_TAGS_KEY))
+
+
+def tag_suggestions_enabled():
+    return asbool(config.get(TAG_SUGGEST_KEY))
+
 
 def _check_access():
     context = {
@@ -256,7 +261,8 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
         schema.update({
             ONTOLOGIES_KEY: [ignore_missing],
             FREE_TAGS_KEY: [ignore_missing],
-            FORCE_RELOAD_KEY: [ignore_missing]
+            FORCE_RELOAD_KEY: [ignore_missing],
+            TAG_SUGGEST_KEY: [ignore_missing]
         })
 
         return schema
@@ -269,7 +275,8 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
         return {
             'semantictags_data_module_source': get_data_module_source,
             'semantictags_available_ontologies': get_available_ontologies,
-            'semantictags_enable_freetags': free_tags_allowed
+            'semantictags_enable_freetags': free_tags_allowed,
+            'semantictags_enable_suggestions': tag_suggestions_enabled
         }
 
     def get_actions(self):
@@ -331,12 +338,25 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
                         FORCE_RELOAD_KEY: 'true' if force_reload else 'false'
                     })
                     toolkit.h.flash_success(toolkit._('Force reload option updated successfully.'))
+                elif action == 'tag_suggest':
+                    tag_suggest = request.form.get(TAG_SUGGEST_KEY)
+                    try:
+                        tag_suggest = asbool(tag_suggest)
+                    except (ValueError, TypeError):
+                        toolkit.h.flash_error(toolkit._('Please specify a value that can be parsed as a boolean.'))
+                    logic.get_action(u'config_option_update')({
+                        u'user': toolkit.c.user
+                    }, {
+                        TAG_SUGGEST_KEY: 'true' if tag_suggest else 'false'
+                    })
+                    toolkit.h.flash_success(toolkit._('Tag suggestion option updated successfully.'))
 
             return toolkit.render('admin_semantictags.jinja2',
                                   extra_vars={
                                       'ontologies': config.get(ONTOLOGIES_KEY, '').strip(),
                                       'free_tags': config.get(FREE_TAGS_KEY).lower(),
-                                      'force_reload': config.get(FORCE_RELOAD_KEY).lower()
+                                      'force_reload': config.get(FORCE_RELOAD_KEY).lower(),
+                                      'tag_suggest': config.get(TAG_SUGGEST_KEY).lower(),
                                   })
 
         return blueprint

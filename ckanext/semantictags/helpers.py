@@ -14,6 +14,7 @@ API_URL = 'https://api.terminology.tib.eu/api/v2/ontologies/{onto}/classes'
 ONTOLOGIES_KEY = 'ckanext.semantictags.ontologies'
 FREE_TAGS_KEY = 'ckanext.semantictags.allow_free_tags'
 FORCE_RELOAD_KEY = 'ckanext.semantictags.force_reload'
+TAG_SUGGEST_KEY = 'ckanext.semantictags.tag_suggest'
 
 
 def get_terms_by_ontology(onto):
