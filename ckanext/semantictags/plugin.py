@@ -104,7 +104,7 @@ def autocomplete_term(context, data_dict):
         results.append({'id': label, 'text': label, 'ontology': ontology})
     return results
 
-@toolkit.side_effect_free
+
 def suggest_tags_from_text(context, data_dict):
     """
     Suggest tags from description text using NFDI4Energy Annotator API.
@@ -117,9 +117,11 @@ def suggest_tags_from_text(context, data_dict):
     tags_util = LDM_tags_util()
     ontology_ids = data_dict.get('ontology_ids') or tags_util.ontologies
     if not ontology_ids:
-        raise toolkit.ValidationError({'ontology_ids': ['No ontologies configured']})
+        log.error('No ontologies configured')
+        return {'suggestions': [], 'count': 0, 'error': 'No ontologies configured'}
 
     try:
+        log.info('Submitting request')
         annotator_response = http_requests.post(
             'https://service.tib.eu/sandbox/nfdi4energyannotator/annotate',
             json={
@@ -129,6 +131,7 @@ def suggest_tags_from_text(context, data_dict):
             },
             timeout=30
         )
+        log.info('Request answered')
         annotator_response.raise_for_status()
         data = annotator_response.json()
 

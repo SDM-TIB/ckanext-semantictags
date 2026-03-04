@@ -17,14 +17,6 @@ semantictags-suggest:
   filters: rjsmin
   contents:
     - js/semantictags_suggest.js
-  extra:
-    preload:
-      - base/main
-
-semantictags-clear-tags:
-  output: semantictags/semantictags_clear_tags.js
-  filters: rjsmin
-  contents:
     - js/semantictags_clear_tags.js
   extra:
     preload:
