@@ -3,16 +3,13 @@ this.ckan.module('semantictags-suggest', function ($) {
     options: {
       notesFieldSelector: '#field-notes',
       tagStringFieldSelector: '#field-tags',
-      buttonText: 'Suggest Tags',
+      buttonText: 'Suggest',
     },
 
     initialize: function () {
       var self = this;
-      this.apiBase = this.sandbox.client.endpoint;
       this.isLoading = false;
       this.notesField = $(this.options.notesFieldSelector);
-
-      console.log('semantictags-suggest module initialized on', this.el);
 
       // Create and attach the suggest button (only if not already present)
       this._createSuggestButton();
@@ -86,30 +83,27 @@ this.ckan.module('semantictags-suggest', function ($) {
       this.isLoading = true;
       this._updateButtonState();
 
-      $.ajax({
-        url: this.apiBase + '/api/3/action/semantictags_suggest_tags',
-        type: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify({
-          text: text,
-        }),
-        dataType: 'json',
-        success: function (response) {
-          if (response.success) {
-            self._populateTags(response.result.suggestions, tagStringField);
-            self._showNotification('Tags suggested successfully', 'success');
-          } else {
-            self._showNotification('Failed to suggest tags: ' + (response.error || 'Unknown error'), 'error');
+      this.sandbox.client.call(
+          'POST',
+          'semantictags_suggest_tags',
+          { text: text },
+          function (response) {
+            if (response.success && !response.result.error) {
+              self._populateTags(response.result.suggestions, tagStringField);
+              self._showNotification('Tags suggested successfully', 'success');
+            } else {
+              var msg = (response.result && response.result.error) || response.error || 'Unknown error';
+              self._showNotification('Failed to suggest tags: ' + msg, 'error');
+            }
+            self.isLoading = false;
+            self._updateButtonState();
+          },
+          function (error) {
+            self._showNotification('Error: ' + error, 'error');
+            self.isLoading = false;
+            self._updateButtonState();
           }
-        },
-        error: function (xhr, status, error) {
-          self._showNotification('Error: ' + error, 'error');
-        },
-        complete: function () {
-          self.isLoading = false;
-          self._updateButtonState();
-        },
-      });
+      );
     },
 
     _populateTags: function (suggestions, tagStringField) {
@@ -139,24 +133,34 @@ this.ckan.module('semantictags-suggest', function ($) {
     },
 
     _showNotification: function (message, type) {
-      var alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
-      var alertHtml = '<div class="alert ' + alertClass + ' alert-dismissible" style="margin-top: 10px;">' +
-        '<button type="button" class="close" data-dismiss="alert">&times;</button>' +
-        message +
-        '</div>';
+      let container = document.querySelector('.flash-messages');
+      if (!container) return;
 
-      var formGroup = this.el.closest('.form-group');
-      if (formGroup.length) {
-        formGroup.after(alertHtml);
-      } else {
-        this.el.after(alertHtml);
+      let success = type === 'success'
+
+      let alertEl = document.createElement('div');
+      alertEl.className = 'alert alert-dismissible fade show ' + (success ? 'alert-success' : 'alert-danger');
+
+      let btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn-close close';
+      btn.setAttribute('data-bs-dismiss', 'alert');
+      btn.setAttribute('aria-label', 'Close');
+
+      let text = document.createTextNode(message);
+
+      alertEl.appendChild(text);
+      alertEl.appendChild(btn);
+
+      container.appendChild(alertEl);
+
+      if (success) {
+        setTimeout(function() {
+          $('.alert-dismissible').fadeOut(function() {
+            $(this).remove();
+          });
+        }, 5000);
       }
-
-      setTimeout(function () {
-        $('.alert-dismissible').fadeOut(function () {
-          $(this).remove();
-        });
-      }, 5000);
-    },
+    }
   };
 });

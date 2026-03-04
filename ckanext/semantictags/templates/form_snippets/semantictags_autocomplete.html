@@ -1,6 +1,7 @@
 {% import 'macros/form.html' as form %}
 {% asset 'semantictags/semantictags-autocomplete-css' %}
 {% asset 'semantictags/semantictags-autocomplete' %}
+{% asset 'semantictags/semantictags-suggest' %}
 
 {% set data_module_source = h.semantictags_data_module_source() %}
 {% set data_module_createtags = h.semantictags_enable_freetags() %}
@@ -11,4 +12,27 @@
     'data-module-createtags': data_module_createtags,
     'data-module-tags': ''
 } %}
-{{ form.input('tag_string', id='field-tags', label=_(field.label), placeholder=_(field.form_placeholder), value=data.tag_string, error=errors.tags, classes=['control-full'], attrs=tag_attrs) }}
+
+<div class="form-group control-full" style="display: flex; align-items: center; gap: 8px;">
+  <div style="flex: 1; min-width: 0;">
+    {{ form.input('tag_string', id='field-tags', label=_(field.label), placeholder=_(field.form_placeholder), value=data.tag_string, error=errors.tags, classes=['control-full'], attrs=tag_attrs) }}
+  </div>
+
+  <div style="display: flex; flex-direction: row; gap: 4px;">
+    <div data-module="semantictags-suggest"
+         data-module-notes-field-selector="#field-notes"
+         data-module-tag-string-field-selector="#field-tags"
+         data-module-button-text="{% trans %}Suggest{% endtrans %}">
+      <button type="button" class="btn btn-default semantictags-suggest-btn" style="white-space: nowrap;">
+        {% trans %}Suggest{% endtrans %}
+      </button>
+    </div>
+    <div data-module="semantictags-clear-tags"
+         data-module-tag-string-field-selector="#field-tags"
+         data-module-button-text="{% trans %}Clear{% endtrans %}">
+      <button type="button" class="btn btn-default semantictags-clear-tags-btn" style="white-space: nowrap;">
+        {% trans %}Clear{% endtrans %}
+      </button>
+    </div>
+  </div>
+</div>
