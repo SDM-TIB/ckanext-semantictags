@@ -58,9 +58,9 @@ If you are using `ckanext-scheming`, change your `tag_string` field declaration 
    ```bash
    ckan -c $CKAN_INI semantictags init
    ```
-   Optionally, default values for `allow_free_tags` and `force_reload` can be set to `true` via flags. These are only applied if no value was previously set in the CKAN configuration — existing configuration values take precedence.
+   Optionally, default values for `allow_free_tags`, `force_reload`, and `tag_suggest` can be set to `true` via flags. These are only applied if no value was previously set in the CKAN configuration — existing configuration values take precedence.
    ```bash
-   ckan -c $CKAN_INI semantictags init --free-tags --force-reload
+   ckan -c $CKAN_INI semantictags init --free-tags --force-reload --tag-suggest
    ```
 
 ## Changelog
