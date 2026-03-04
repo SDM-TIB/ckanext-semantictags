@@ -5,6 +5,7 @@
 
 {% set data_module_source = h.semantictags_data_module_source() %}
 {% set data_module_createtags = h.semantictags_enable_freetags() %}
+{% set tag_suggestions = h.semantictags_enable_suggestions() %}
 
 {% set tag_attrs = {
     'data-module': 'semantictags-autocomplete',
@@ -19,6 +20,7 @@
   </div>
 
   <div style="display: flex; flex-direction: row; gap: 4px;">
+    {% if tag_suggestions %}
     <div data-module="semantictags-suggest"
          data-module-notes-field-selector="#field-notes"
          data-module-tag-string-field-selector="#field-tags"
@@ -27,6 +29,7 @@
         {% trans %}Suggest{% endtrans %}
       </button>
     </div>
+    {% endif %}
     <div data-module="semantictags-clear-tags"
          data-module-tag-string-field-selector="#field-tags"
          data-module-button-text="{% trans %}Clear{% endtrans %}">

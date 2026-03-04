@@ -4,7 +4,7 @@ import ckan.model as model
 import ckan.plugins.toolkit as toolkit
 import click
 
-from ckanext.semantictags.helpers import get_terms_by_ontology, FREE_TAGS_KEY, FORCE_RELOAD_KEY, generate_tag_vocabulary, LDM_tags_util
+from ckanext.semantictags.helpers import get_terms_by_ontology, FREE_TAGS_KEY, FORCE_RELOAD_KEY, TAG_SUGGEST_KEY, generate_tag_vocabulary, LDM_tags_util
 from ckanext.semantictags.model import tag as tag_model
 from ckanext.semantictags.model.crud import OntologyManager, TagQuery, VocabularyQuery
 
@@ -50,7 +50,8 @@ def semantictags():
 @semantictags.command('init')
 @click.option('--free-tags/--no-free-tags', default=False, help='Allow free tags by default')
 @click.option('--force-reload/--no-force-reload', default=False, help='Force reload of vocabularies by default')
-def init(free_tags, force_reload):
+@click.option('--tag-suggest/--no-tag-suggest', default=False, help='Enable tag suggestions by default')
+def init(free_tags, force_reload, tag_suggest):
     """
     Initialize ckanext-semantictags runtime data:
 
@@ -66,6 +67,7 @@ def init(free_tags, force_reload):
 
     _ensure_default(FREE_TAGS_KEY, free_tags)
     _ensure_default(FORCE_RELOAD_KEY, force_reload)
+    _ensure_default(TAG_SUGGEST_KEY, tag_suggest)
 
     generate_tag_vocabulary()
 

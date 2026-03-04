@@ -3,7 +3,10 @@
 # Semantic Tags
 
 `ckanext-semantictags` is a CKAN extension that adds support for ontology-backed keywords for your datasets.
-The extension reads the ontologies from the [TIB-hosted Terminology Service](https://terminology.tib.eu/ts/). 
+The extension reads the ontologies from the [TIB-hosted Terminology Service](https://terminology.tib.eu/ts/).
+
+> [!NOTE]
+> `ckanext-semantictags` uses the [NFDI4Energy Annotator API](https://service.tib.eu/sandbox/nfdi4energyannotator/docs#/) for tag suggestions from the description which only supports energy-related ontologies at the moment.
 
 ## Installation
 
@@ -15,6 +18,8 @@ pip install -e ./ckanext-semantictags
 pip install -r ./ckanext-semantictags/requirements.txt
 ```
 
+After installing the plugin, add `semantictags` to the plugins in your `ckan.ini`.
+
 ## Configuration Options
 
 - `ckanext.semantictags.ontologies` the ontologies to use for semantic tag suggestions
@@ -23,6 +28,9 @@ pip install -r ./ckanext-semantictags/requirements.txt
   - Default: `false`
 - `ckanext.semantictags.force_reload` whether to force a reload of the ontologies on startup, instead of using the cached version
   - Default: `false`
+- `ckanext.semantictags.force_reload` whether to use the [NFDI4Energy Annotator API](https://service.tib.eu/sandbox/nfdi4energyannotator/docs#/) for tag suggestions from the description
+  - Default: `false`
+  - Note: Currently, only energy-related ontologies are supported
 
 ## Usage
 
