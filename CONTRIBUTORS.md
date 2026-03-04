@@ -4,3 +4,7 @@ A list of all the people who contributed to the project.
 ## Core Team
 - Luis Niewöhner
 - Philipp D. Rohde [ORCID:0000-0002-9835-4354](https://orcid.org/0000-0002-9835-4354)
+
+## Contributors
+- Aamir Muhammad
+  - Tag suggestion from dataset description
