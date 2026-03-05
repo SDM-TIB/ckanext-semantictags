@@ -28,7 +28,7 @@ After installing the plugin, add `semantictags` to the plugins in your `ckan.ini
   - Default: `false`
 - `ckanext.semantictags.force_reload` whether to force a reload of the ontologies on startup, instead of using the cached version
   - Default: `false`
-- `ckanext.semantictags.force_reload` whether to use the [NFDI4Energy Annotator API](https://service.tib.eu/sandbox/nfdi4energyannotator/docs#/) for tag suggestions from the description
+- `ckanext.semantictags.tag_suggest` whether to use the [NFDI4Energy Annotator API](https://service.tib.eu/sandbox/nfdi4energyannotator/docs#/) for tag suggestions from the description
   - Default: `false`
   - Note: Currently, only energy-related ontologies are supported
 
