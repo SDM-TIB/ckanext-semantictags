@@ -1,10 +1,13 @@
+import os
 import logging
 import requests
-
+from datetime import datetime
 from ckan.common import config
 from ckan.lib.munge import munge_tag
 from ckan.plugins.toolkit import asbool
 from ckanext.semantictags.model.crud import OntologyManager, TagQuery, VocabularyQuery
+
+import redis
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -13,6 +16,11 @@ API_URL = 'https://api.terminology.tib.eu/api/v2/ontologies/{onto}/classes'
 ONTOLOGIES_KEY = 'ckanext.semantictags.ontologies'
 FREE_TAGS_KEY = 'ckanext.semantictags.allow_free_tags'
 FORCE_RELOAD_KEY = 'ckanext.semantictags.force_reload'
+
+redis_url = os.getenv('CKAN_REDIS_URL', 'redis://localhost:6379/0')
+redis_client = redis.from_url(redis_url)
+UPDATE_FREQUENCY_KEY = 'ckanext.semantictags.updatefrequency'
+COOLDOWN_KEY = 'ckanext.semantictags.cooldown'
 
 
 def get_terms_by_ontology(onto):
@@ -136,6 +144,7 @@ class LDM_tags_util:
         # Delete ontologies that are no longer needed
         for ontology in to_delete:
             OntologyManager.delete_ontology(vocab.id, ontology)
+            clear_last_loaded(ontology)
 
         for ontology in to_add:
             # check again if loading is required
@@ -148,5 +157,90 @@ class LDM_tags_util:
                 terms = get_terms_by_ontology(ontology)
                 OntologyManager.add_ontology(vocab.id, ontology, terms, refresh_existing=force_reload_vocabulary_tags)
                 log.debug(f"Loaded {len(terms)} terms from {ontology}")
+
+                set_last_loaded(ontology)
             except Exception as e:
                 log.error(f"Failed to load ontology {ontology}: {e}")
+
+
+def reload_single_ontology(ontology_id, refresh_existing=True): 
+
+    tags_util = LDM_tags_util()
+    vocab = VocabularyQuery.read_name(tags_util.vocabulary_name_default)
+
+    if vocab is None:
+        log.error(f'reload_single_ontology: vocabulary "{tags_util.vocabulary_name_default}" does not exist.')
+        raise RuntimeError(f'Vocabulary not found, cannot reload "{ontology_id}".')
+ 
+    terms = get_terms_by_ontology(ontology_id)
+    OntologyManager.add_ontology(vocab.id, ontology_id, terms, refresh_existing=refresh_existing)
+    
+    set_last_loaded(ontology_id)
+    log.info(f'reload_single_ontology: "{ontology_id}" updated, last_loaded timestamp set.')
+
+def store_value(key, value):
+    try:
+        redis_client.set(key, value)
+        log.debug(f"Stored in Redis: {key} -> {value}")
+    except Exception as e:
+        log.error(f"Error storing value in Redis: {e}")
+
+def get_value(key, default_value=None):
+    try:
+        value = redis_client.get(key)
+        if value is not None:
+            value = value.decode('utf-8')
+            log.debug(f"Retrieved from Redis: {key} -> {value}")
+            return value
+        return default_value
+    except Exception as e:
+        log.error(f"Error retrieving value from Redis: {e}")
+        return default_value
+    
+def acquire_lock(lock_name):
+    lock = redis_client.lock(lock_name, timeout=30)
+    acquired = lock.acquire(blocking=False)
+    return acquired, lock   
+
+def set_cooldown(ttl_seconds):
+    try:
+        if ttl_seconds > 0:
+            redis_client.set(COOLDOWN_KEY, '1', ex=ttl_seconds)
+    except Exception as e:
+        log.error(f"Error setting cooldown in Redis: {e}")
+
+ 
+def clear_cooldown():
+    try:
+        redis_client.delete(COOLDOWN_KEY)
+    except Exception as e:
+        log.error(f"Error clearing cooldown in Redis: {e}")
+
+def is_cooling_down():
+    try:
+        return redis_client.exists(COOLDOWN_KEY) > 0
+    except Exception as e:
+        log.error(f"Error checking cooldown in Redis: {e}")
+        return False
+    
+
+def _last_loaded_key(ontology_id: str) -> str:
+    return f'ckanext.semantictags.last_loaded:{ontology_id}'
+
+def get_last_loaded(ontology_id): 
+    ts = get_value(_last_loaded_key(ontology_id))
+    if ts is None: 
+        return None
+    try: 
+        return datetime.fromisoformat(ts)
+    except ValueError:
+        return None
+
+def set_last_loaded(ontology_id):
+    store_value(_last_loaded_key(ontology_id), datetime.utcnow().isoformat())
+
+def clear_last_loaded(ontology_id):
+    try:
+        redis_client.delete(_last_loaded_key(ontology_id))
+    except Exception as e:
+        log.error(f"Error clearing last_loaded for {ontology_id}: {e}")
