@@ -14,8 +14,14 @@ from ckan.plugins.toolkit import asbool
 from flask import Blueprint, request
 
 from ckanext.semantictags import cli
-from ckanext.semantictags.helpers import ONTOLOGIES_KEY, FREE_TAGS_KEY, FORCE_RELOAD_KEY, TAG_SUGGEST_KEY, \
-    generate_tag_vocabulary, LDM_tags_util, resolve_vocab_tags
+
+from ckanext.semantictags.helpers import (
+    ONTOLOGIES_KEY, FREE_TAGS_KEY, FORCE_RELOAD_KEY, UPDATE_FREQUENCY_KEY, TAG_SUGGEST_KEY,
+    generate_tag_vocabulary, LDM_tags_util, resolve_vocab_tags,
+    search_ontologies, 
+    get_available_ontologies, 
+)
+from ckanext.semantictags.tasks import Scheduler
 from ckanext.semantictags.model import tag as tag_model
 from ckanext.semantictags.model.crud import OntologyManager, TagQuery, VocabularyQuery
 
@@ -163,6 +169,12 @@ def suggest_tags_from_text(context, data_dict):
         log.error(f'Annotator request failed: {e}')
         return {'error': 'Annotation service unavailable', 'suggestions': []}
 
+@toolkit.side_effect_free
+def ontology_search_action(context, data_dict):
+    query = data_dict.get('q', '')
+    limit = int(data_dict.get('limit', 20))
+    return search_ontologies(query, limit=limit)
+
 
 @toolkit.side_effect_free
 def package_show(context, data_dict):
@@ -186,7 +198,6 @@ def package_show(context, data_dict):
 
     return data
 
-
 def package_create(context, data_dict):
     resolve_vocab_tags(data_dict)
     return core_package_create(context, data_dict)
@@ -201,7 +212,7 @@ def get_data_module_source():
     return '/api/3/action/semantictags_autocomplete?incomplete=?'
 
 
-def get_available_ontologies():
+def get_loaded_ontologies():
     return OntologyManager.list_ontologies()
 
 
@@ -237,7 +248,7 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         tag_model.init_table()
-        # generate_tag_vocabulary()
+        self.scheduler = None
 
     def before_create(self, context, data_dict):
         resolve_vocab_tags(data_dict)
@@ -255,14 +266,21 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
         toolkit.add_resource('static', 'semantictags')
         toolkit.add_ckan_admin_tab(config_, 'semantictags.admin', 'SemanticTags', icon='tags')
 
+        if config_.get(UPDATE_FREQUENCY_KEY, None) is None:
+            config_[UPDATE_FREQUENCY_KEY] = 60
+ 
+        self.scheduler = Scheduler()
+
     def update_config_schema(self, schema):
         ignore_missing = toolkit.get_validator('ignore_missing')
+        int_validator = toolkit.get_validator('int_validator')
 
         schema.update({
             ONTOLOGIES_KEY: [ignore_missing],
             FREE_TAGS_KEY: [ignore_missing],
             FORCE_RELOAD_KEY: [ignore_missing],
-            TAG_SUGGEST_KEY: [ignore_missing]
+            TAG_SUGGEST_KEY: [ignore_missing],
+            UPDATE_FREQUENCY_KEY: [ignore_missing, int_validator],
         })
 
         return schema
@@ -274,7 +292,7 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
         # other extensions.
         return {
             'semantictags_data_module_source': get_data_module_source,
-            'semantictags_available_ontologies': get_available_ontologies,
+            'semantictags_available_ontologies': get_loaded_ontologies,
             'semantictags_enable_freetags': free_tags_allowed,
             'semantictags_enable_suggestions': tag_suggestions_enabled
         }
@@ -284,6 +302,7 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
             'semantictags_autocomplete': autocomplete_term,
             'semantictags_term_details': term_details,
             'semantictags_suggest_tags': suggest_tags_from_text,
+            'semantictags_ontology_search': ontology_search_action,
             'package_show': package_show, 
             'package_create': package_create,
             'package_update': package_update
@@ -298,22 +317,22 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
 
             if request.method == 'POST':
                 action = request.form.get('action', None)
+                
                 if action == 'ontologies':
-                    ontologies = request.form.get(ONTOLOGIES_KEY, '').strip()
-                    if not ontologies:
-                        toolkit.h.flash_error(toolkit._('Please specify at least one ontology.'))
+                    ontologies_str = request.form.get(ONTOLOGIES_KEY, '').strip()
+                    ontologies_list = [o.strip() for o in ontologies_str.split(',') if o.strip()]
+
+                    if not ontologies_list:
+                        toolkit.h.flash_error(toolkit._('Please select at least one ontology.'))
                     else:
                         logic.get_action(u'config_option_update')({
                             u'user': toolkit.c.user
                         }, {
-                            ONTOLOGIES_KEY: ontologies
+                            ONTOLOGIES_KEY: ' '.join(ontologies_list)
                         })
-
-                        # Update ontology list
-                        ontologies_list = ontologies.split()
                         generate_tag_vocabulary(ontologies=ontologies_list)
-
                         toolkit.h.flash_success(toolkit._('New ontologies set successfully.'))
+                
                 elif action == 'free_tags':
                     free_tags = request.form.get(FREE_TAGS_KEY)
                     try:
@@ -351,12 +370,41 @@ class LDMtagsPlugin(plugins.SingletonPlugin):
                     })
                     toolkit.h.flash_success(toolkit._('Tag suggestion option updated successfully.'))
 
+                elif action == 'freq':
+                    update_freq = request.form.get(UPDATE_FREQUENCY_KEY, None)
+                    try:
+                        update_freq = int(update_freq)
+                        logic.get_action(u'config_option_update')({
+                            u'user': toolkit.c.user
+                        }, {
+                            UPDATE_FREQUENCY_KEY: update_freq
+                        })
+                        try:
+                            scheduler = Scheduler()
+                            scheduler.update_interval()
+                        except Exception:
+                            toolkit.h.flash_error(toolkit._(
+                                'The update frequency was not updated due to an error rescheduling the background job.'
+                            ))
+                        toolkit.h.flash_success(toolkit._('Update frequency has been updated successfully.'))
+                    except (ValueError, TypeError):
+                        toolkit.h.flash_error(toolkit._(
+                            'The update frequency is specified in full minutes. Please provide a value that can be parsed as an integer.'
+                        ))
+
+            available = get_available_ontologies()
+            title_lookup = {o['id']: o['text'] for o in available}
+            preselected_ontologies = [{'id': oid, 'text': title_lookup.get(oid, oid)} for oid in config.get(ONTOLOGIES_KEY, '').strip().split() if oid]
+
+
             return toolkit.render('admin_semantictags.jinja2',
                                   extra_vars={
                                       'ontologies': config.get(ONTOLOGIES_KEY, '').strip(),
+                                      'preselected_ontologies': preselected_ontologies,
                                       'free_tags': config.get(FREE_TAGS_KEY).lower(),
                                       'force_reload': config.get(FORCE_RELOAD_KEY).lower(),
                                       'tag_suggest': config.get(TAG_SUGGEST_KEY).lower(),
+                                      'freq': config.get(UPDATE_FREQUENCY_KEY),
                                   })
 
         return blueprint

@@ -1,61 +1,185 @@
 {% extends "admin/base.html" %}
-
 {% import 'macros/form.html' as form %}
 
+{% block styles %}
+  {{ super() }}
+  <style>
+    .select2-container { width: 100% !important; }
+    .ontology-option-description { font-size: 0.85em; color: #666; white-space: normal; }
+  </style>
+{% endblock %}
+
 {% block primary_content_inner %}
-    <div>
-        <form method="POST" action="{{ h.url_for('semantictags.admin') }}">
-            {{ form.input('ckanext.semantictags.ontologies', label=_('Ontologies'), value=ontologies, placeholder=_('e.g., oeo'), is_required=true) }}
-            <input type="hidden" name="action" value="ontologies">
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary" title="{% trans %}Update{% endtrans %}">{% trans %}Update{% endtrans %}</button>
-            </div>
-        </form>
-    </div>
-    <hr>
-    <div>
-        <form method="POST" action="{{ h.url_for('semantictags.admin') }}">
-            {{ form.select('ckanext.semantictags.allow_free_tags', label=_('Allow Free Tags'), options=[{'value': 'true', 'text': _('Yes')}, {'value': 'false',  'text': _('No')}], selected=free_tags, classes=['control-medium'], is_required=true) }}
-            <input type="hidden" name="action" value="free_tags">
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary" title="{% trans %}Update{% endtrans %}">{% trans %}Update{% endtrans %}</button>
-            </div>
-        </form>
-    </div>
-    <hr>
-    <div>
-        <form method="POST" action="{{ h.url_for('semantictags.admin') }}">
-            {{ form.select('ckanext.semantictags.force_reload', label=_('Force Tag Reload'), options=[{'value': 'true', 'text': _('Yes')}, {'value': 'false',  'text': _('No')}], selected=force_reload, classes=['control-medium'], is_required=true) }}
-            <input type="hidden" name="action" value="force_reload">
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary" title="{% trans %}Update{% endtrans %}">{% trans %}Update{% endtrans %}</button>
-            </div>
-        </form>
-    </div>
-    <hr>
-    <div>
-        <form method="POST" action="{{ h.url_for('semantictags.admin') }}">
-            {{ form.select('ckanext.semantictags.tag_suggest', label=_('Tag Suggestion Feature'), options=[{'value': 'true', 'text': _('Enabled')}, {'value': 'false',  'text': _('Disabled')}], selected=tag_suggest, classes=['control-medium'], is_required=true) }}
-            <input type="hidden" name="action" value="tag_suggest">
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary" title="{% trans %}Update{% endtrans %}">{% trans %}Update{% endtrans %}</button>
-            </div>
-        </form>
-    </div>
+
+  {# ------------------------------------------------------------------ #}
+  {# Ontologies — select2 v3 multi-select backed by TIB TS API          #}
+  {# input[type=hidden] holds comma-separated ids on submit             #}
+  {# ------------------------------------------------------------------ #}
+  <div>
+    <form method="POST" action="{{ h.url_for('semantictags.admin') }}" id="ontologies-form">
+      <input type="hidden" name="action" value="ontologies">
+      <div class="control-group">
+        <label class="control-label" for="ontology-select">
+          {{ _('Ontologies') }}
+          <span title="{{ _('Required field') }}" class="control-required">*</span>
+        </label>
+        <div class="controls">
+          <input type="hidden"
+                 id="ontology-select"
+                 name="ckanext.semantictags.ontologies"
+                 value="{{ preselected_ontologies | map(attribute='id') | join(',') }}"
+                 style="width:100%">
+          <p class="help-block">
+            {{ _('Search and select ontologies from the TIB Terminology Service. Click × on a pill to remove it.') }}
+          </p>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary" title="{% trans %}Update{% endtrans %}">{% trans %}Update{% endtrans %}</button>
+      </div>
+    </form>
+  </div>
+
+  <hr>
+
+  {# ------------------------------------------------------------------ #}
+  {# Allow Free Tags                                                     #}
+  {# ------------------------------------------------------------------ #}
+  <div>
+    <form method="POST" action="{{ h.url_for('semantictags.admin') }}">
+      {{ form.select('ckanext.semantictags.allow_free_tags', label=_('Allow Free Tags'), options=[{'value': 'true', 'text': _('Yes')}, {'value': 'false', 'text': _('No')}], selected=free_tags, classes=['control-medium'], is_required=true) }}
+      <input type="hidden" name="action" value="free_tags">
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary" title="{% trans %}Update{% endtrans %}">{% trans %}Update{% endtrans %}</button>
+      </div>
+    </form>
+  </div>
+
+  <hr>
+
+  {# ------------------------------------------------------------------ #}
+  {# Force Tag Reload                                                    #}
+  {# ------------------------------------------------------------------ #}
+  <div>
+    <form method="POST" action="{{ h.url_for('semantictags.admin') }}">
+      {{ form.select('ckanext.semantictags.force_reload', label=_('Force Tag Reload'), options=[{'value': 'true', 'text': _('Yes')}, {'value': 'false', 'text': _('No')}], selected=force_reload, classes=['control-medium'], is_required=true) }}
+      <input type="hidden" name="action" value="force_reload">
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary" title="{% trans %}Update{% endtrans %}">{% trans %}Update{% endtrans %}</button>
+      </div>
+    </form>
+  </div>
+
+  <hr>
+
+  {# ------------------------------------------------------------------ #}
+  {# Tag Suggestion Feature                                              #}
+  {# ------------------------------------------------------------------ #}
+  <div>
+    <form method="POST" action="{{ h.url_for('semantictags.admin') }}">
+      {{ form.select('ckanext.semantictags.tag_suggest', label=_('Tag Suggestion Feature'), options=[{'value': 'true', 'text': _('Enabled')}, {'value': 'false', 'text': _('Disabled')}], selected=tag_suggest, classes=['control-medium'], is_required=true) }}
+      <input type="hidden" name="action" value="tag_suggest">
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary" title="{% trans %}Update{% endtrans %}">{% trans %}Update{% endtrans %}</button>
+      </div>
+    </form>
+  </div>
+
+  <hr>
+
+  {# ------------------------------------------------------------------ #}
+  {# Auto-update Frequency                                               #}
+  {# ------------------------------------------------------------------ #}
+  <div>
+    <form method="POST" action="{{ h.url_for('semantictags.admin') }}">
+      {{ form.input('ckanext.semantictags.updatefrequency', label=_('Auto-update Frequency (minutes)'), value=freq, placeholder=_('e.g., 60'), type='number') }}
+      <input type="hidden" name="action" value="freq">
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary" title="{% trans %}Update{% endtrans %}">{% trans %}Update{% endtrans %}</button>
+      </div>
+    </form>
+  </div>
+
 {% endblock %}
 
 {% block secondary_content %}
-    <div class="module module-narrow module-shallow">
-        <h2 class="module-heading">
-            <i class="fa fa-info-circle"></i>
-            SemanticTags
-        </h2>
-        <div class="module-content">
-            <p>{% trans %}Configuration options to manage semantic tags.{% endtrans %}</p>
-            <p><strong>{% trans %}Ontologies{% endtrans %}:</strong> {% trans %}The short names (seperated by spaces) of the ontologies in the <a href="https://terminology.tib.eu/ts/" target="_blank">TIB Terminology Service</a> that are used for annotating datasets.{% endtrans %}</p>
-            <p><strong>{% trans %}Allow Free Tags{% endtrans %}:</strong> {% trans %}Whether to allow users to add their own tags that do not belong to the configured ontologies.{% endtrans %}</p>
-            <p><strong>{% trans %}Force Tag Reload{% endtrans %}:</strong> {% trans %}Whether to reload all tags on startup even if the ontology / ontologies are already loaded.{% endtrans %}</p>
-            <p><strong>{% trans %}Tag Suggestion Feature{% endtrans %}</strong> {% trans %}Analyzes the description text and suggests relevant tags using the <a href="https://service.tib.eu/sandbox/nfdi4energyannotator/docs#/" target="_blank">NFDI4Energy Annotator API</a>. The suggested tags are filtered to only include terms from the configured ontologies.{% endtrans %}</p>
-        </div>
+  <div class="module module-narrow module-shallow">
+    <h2 class="module-heading">
+      <i class="fa fa-info-circle"></i>
+      SemanticTags
+    </h2>
+    <div class="module-content">
+      <p>{% trans %}Configuration options to manage semantic tags.{% endtrans %}</p>
+      <p><strong>{% trans %}Ontologies{% endtrans %}:</strong> {% trans %}Search and select ontologies from the <a href="https://terminology.tib.eu/ts/" target="_blank">TIB Terminology Service</a> to use for annotating datasets.{% endtrans %}</p>
+      <p><strong>{% trans %}Allow Free Tags{% endtrans %}:</strong> {% trans %}Whether to allow users to add their own tags that do not belong to the configured ontologies.{% endtrans %}</p>
+      <p><strong>{% trans %}Force Tag Reload{% endtrans %}:</strong> {% trans %}Whether to reload all tags on startup even if the ontology / ontologies are already loaded.{% endtrans %}</p>
+      <p><strong>{% trans %}Tag Suggestion Feature{% endtrans %}</strong> {% trans %}Analyzes the description text and suggests relevant tags using the <a href="https://service.tib.eu/sandbox/nfdi4energyannotator/docs#/" target="_blank">NFDI4Energy Annotator API</a>. The suggested tags are filtered to only include terms from the configured ontologies.{% endtrans %}</p>
+      <p><strong>{% trans %}Auto-update Frequency{% endtrans %}:</strong> {% trans %}How often (in minutes) the system checks the TIB Terminology Service for updated ontology versions and reloads them automatically.{% endtrans %}</p>
     </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var $ = window.jQuery;
+      if (!$) {
+        console.error('SemanticTags: jQuery not available.');
+        return;
+      }
+
+      var preselected = [
+        {% for onto in preselected_ontologies %}
+          { id: "{{ onto.id }}", text: "{{ onto.text }}" }{% if not loop.last %},{% endif %}
+        {% endfor %}
+      ];
+
+      $('#ontology-select').select2({
+        multiple: true,
+        placeholder: '{{ _("Type to search ontologies...") }}',
+        minimumInputLength: 1,
+
+        ajax: {
+          url: '/api/3/action/semantictags_ontology_search',
+          dataType: 'json',
+          quietMillis: 300,
+          data: function (term) {
+            return { q: term, limit: 20 };
+          },
+          results: function (data) {
+            if (data.success && data.result && data.result.results) {
+              return { results: data.result.results };
+            }
+            return { results: [] };
+          },
+          cache: true
+        },
+
+        formatResult: function (item) {
+          var desc = item.description
+            ? '<div class="ontology-option-description">' + item.description + '</div>'
+            : '';
+          return '<div><strong>' + item.text + '</strong>' + desc + '</div>';
+        },
+
+        formatSelection: function (item) {
+          return item.text;
+        },
+
+        initSelection: function (element, callback) {
+          var ids = $(element).val();
+          if (!ids) { callback([]); return; }
+          var idList = ids.split(',').map(function (s) { return s.trim(); });
+          var data = idList.map(function (id) {
+            for (var i = 0; i < preselected.length; i++) {
+              if (preselected[i].id === id) { return preselected[i]; }
+            }
+            return { id: id, text: id };
+          });
+          callback(data);
+        }
+      });
+    });
+  </script>
 {% endblock %}
