@@ -7,6 +7,7 @@
     .select2-container { width: 100% !important; }
     .ontology-option-description { font-size: 0.85em; color: #666; white-space: normal; }
   </style>
+  {% asset 'semantictags/semantictags-autocomplete-css' %}
 {% endblock %}
 
 {% block primary_content_inner %}
@@ -157,10 +158,12 @@
         },
 
         formatResult: function (item) {
-          var desc = item.description
-            ? '<div class="ontology-option-description">' + item.description + '</div>'
-            : '';
-          return '<div><strong>' + item.text + '</strong>' + desc + '</div>';
+          return (
+            '<span class="semantictags-result">' +
+              '<span class="semantictags-result__label">' + item.text + '</span>' +
+              '<span class="semantictags-result__ontology">' + item.id + '</span>' +
+            '</span>'
+          );
         },
 
         formatSelection: function (item) {

@@ -24,6 +24,7 @@ redis_client = redis.from_url(redis_url)
 UPDATE_FREQUENCY_KEY = 'ckanext.semantictags.updatefrequency'
 COOLDOWN_KEY = 'ckanext.semantictags.cooldown'
 
+
 def search_ontologies(query, limit=10):
     available = get_available_ontologies()
     if not query: 
@@ -40,15 +41,14 @@ def search_ontologies(query, limit=10):
     
     return {'results': results}
 
+
 def get_available_ontologies(page_size = 100):
-    
     ontologies = []
     page = 0
     
     try: 
         while True: 
-            response = requests.get(API_URL, params={'page': page, 'size': page_size},
-                timeout=15)
+            response = requests.get(API_URL, params={'page': page, 'size': page_size}, timeout=15)
             response.raise_for_status()
             data = response.json()
 
@@ -57,8 +57,8 @@ def get_available_ontologies(page_size = 100):
                 title = element.get('title')
                 ontologies.append({
                     'id': ontology_id, 
-                    'text': f'{title} ({ontology_id})'})
-                
+                    'text': title})
+
             total_pages = data.get('totalPages', 1)
             page += 1
             if page >= total_pages:
@@ -68,6 +68,7 @@ def get_available_ontologies(page_size = 100):
         return []
     
     return ontologies
+
 
 def get_terms_by_ontology(onto):
     api_url = f"{API_URL}{onto}/classes"
