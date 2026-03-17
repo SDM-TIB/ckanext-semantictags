@@ -12,7 +12,7 @@ import redis
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
-API_URL = 'https://api.terminology.tib.eu/api/v2/ontologies/{onto}/classes'
+API_URL = 'https://api.terminology.tib.eu/api/v2/ontologies/'
 ONTOLOGIES_KEY = 'ckanext.semantictags.ontologies'
 FREE_TAGS_KEY = 'ckanext.semantictags.allow_free_tags'
 FORCE_RELOAD_KEY = 'ckanext.semantictags.force_reload'
@@ -22,9 +22,53 @@ redis_client = redis.from_url(redis_url)
 UPDATE_FREQUENCY_KEY = 'ckanext.semantictags.updatefrequency'
 COOLDOWN_KEY = 'ckanext.semantictags.cooldown'
 
+def search_ontologies(query, limit=10):
+    available = get_available_ontologies()
+    if not query: 
+        return {'results': available[:limit]}
+
+    query = query.lower()
+    results = []
+    for onto in available: 
+        if query in onto['text'].lower():
+            results.append(onto)
+
+        if len(results) >= limit: 
+            break
+    
+    return {'results': results}
+
+def get_available_ontologies(page_size = 100):
+    
+    ontologies = []
+    page = 0
+    
+    try: 
+        while True: 
+            response = requests.get(API_URL, params={'page': page, 'size': page_size},
+                timeout=15)
+            response.raise_for_status()
+            data = response.json()
+
+            for element in data.get('elements', []):
+                ontology_id = element.get('ontologyId')
+                title = element.get('title')
+                ontologies.append({
+                    'id': ontology_id, 
+                    'text': f'{title} ({ontology_id})'})
+                
+            total_pages = data.get('totalPages', 1)
+            page += 1
+            if page >= total_pages:
+                break
+    except Exception as e:
+        log.error(f'Failed to fetch ontology list from TIB TS: {e}')
+        return []
+    
+    return ontologies
 
 def get_terms_by_ontology(onto):
-    api_url = API_URL.format(onto=onto)
+    api_url = f"{API_URL}{onto}/classes"
     terms = []
     page = 0
     while True:
