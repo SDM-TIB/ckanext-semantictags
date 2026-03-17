@@ -3,19 +3,11 @@
 
 {% block styles %}
   {{ super() }}
-  <style>
-    .select2-container { width: 100% !important; }
-    .ontology-option-description { font-size: 0.85em; color: #666; white-space: normal; }
-  </style>
+  {% asset 'semantictags/semantictags-admin-css' %}
   {% asset 'semantictags/semantictags-autocomplete-css' %}
 {% endblock %}
 
 {% block primary_content_inner %}
-
-  {# ------------------------------------------------------------------ #}
-  {# Ontologies — select2 v3 multi-select backed by TIB TS API          #}
-  {# input[type=hidden] holds comma-separated ids on submit             #}
-  {# ------------------------------------------------------------------ #}
   <div>
     <form method="POST" action="{{ h.url_for('semantictags.admin') }}" id="ontologies-form">
       <input type="hidden" name="action" value="ontologies">
@@ -42,10 +34,6 @@
   </div>
 
   <hr>
-
-  {# ------------------------------------------------------------------ #}
-  {# Allow Free Tags                                                     #}
-  {# ------------------------------------------------------------------ #}
   <div>
     <form method="POST" action="{{ h.url_for('semantictags.admin') }}">
       {{ form.select('ckanext.semantictags.allow_free_tags', label=_('Allow Free Tags'), options=[{'value': 'true', 'text': _('Yes')}, {'value': 'false', 'text': _('No')}], selected=free_tags, classes=['control-medium'], is_required=true) }}
@@ -57,10 +45,6 @@
   </div>
 
   <hr>
-
-  {# ------------------------------------------------------------------ #}
-  {# Force Tag Reload                                                    #}
-  {# ------------------------------------------------------------------ #}
   <div>
     <form method="POST" action="{{ h.url_for('semantictags.admin') }}">
       {{ form.select('ckanext.semantictags.force_reload', label=_('Force Tag Reload'), options=[{'value': 'true', 'text': _('Yes')}, {'value': 'false', 'text': _('No')}], selected=force_reload, classes=['control-medium'], is_required=true) }}
@@ -72,10 +56,6 @@
   </div>
 
   <hr>
-
-  {# ------------------------------------------------------------------ #}
-  {# Tag Suggestion Feature                                              #}
-  {# ------------------------------------------------------------------ #}
   <div>
     <form method="POST" action="{{ h.url_for('semantictags.admin') }}">
       {{ form.select('ckanext.semantictags.tag_suggest', label=_('Tag Suggestion Feature'), options=[{'value': 'true', 'text': _('Enabled')}, {'value': 'false', 'text': _('Disabled')}], selected=tag_suggest, classes=['control-medium'], is_required=true) }}
@@ -87,10 +67,6 @@
   </div>
 
   <hr>
-
-  {# ------------------------------------------------------------------ #}
-  {# Auto-update Frequency                                               #}
-  {# ------------------------------------------------------------------ #}
   <div>
     <form method="POST" action="{{ h.url_for('semantictags.admin') }}">
       {{ form.input('ckanext.semantictags.updatefrequency', label=_('Auto-update Frequency (minutes)'), value=freq, placeholder=_('e.g., 60'), type='number') }}

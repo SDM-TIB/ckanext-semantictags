@@ -1,0 +1,9 @@
+.select2-container {
+  width: 100% !important;
+}
+
+.ontology-option-description {
+  font-size: 0.85em;
+  color: #666;
+  white-space: normal;
+}

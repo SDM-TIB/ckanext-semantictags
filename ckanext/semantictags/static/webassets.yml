@@ -1,3 +1,8 @@
+semantictags-admin-css:
+  output: semantictags/semantictags_admin.css
+  contents:
+    - css/semantictags_admin.css
+
 semantictags-autocomplete-css:
   output: semantictags/semantictags_autocomplete.css
   contents:
